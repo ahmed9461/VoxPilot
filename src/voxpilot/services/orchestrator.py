@@ -43,6 +43,39 @@ class Orchestrator:
             min_inet_down_mbps=self.settings.vast_min_inet_down_mbps,
         )
 
+    def _offer_eligible(self, offer: GpuOffer) -> bool:
+        if offer.offer_id <= 0:
+            return False
+        if offer.gpu_ram_gb < self.settings.vast_min_gpu_ram_gb:
+            return False
+        if offer.price_per_hour <= 0 or offer.price_per_hour > self.settings.vast_max_price_usd_hour:
+            return False
+        if offer.reliability is None or offer.reliability < self.settings.vast_min_reliability:
+            return False
+        if offer.disk_space_gb is not None and offer.disk_space_gb < self.settings.vast_disk_gb:
+            return False
+        if self.settings.vast_verified_only and offer.verified is False:
+            return False
+        if self.settings.vast_min_inet_down_mbps > 0 and (offer.inet_down_mbps or 0.0) < self.settings.vast_min_inet_down_mbps:
+            return False
+
+        raw = offer.raw or {}
+        if raw:
+            if int(raw.get("num_gpus") or 1) != 1:
+                return False
+            if raw.get("rentable") is False:
+                return False
+            if self.settings.vast_datacenter_only and not bool(raw.get("datacenter")):
+                return False
+            if self.settings.vast_min_direct_ports > 0:
+                try:
+                    direct_ports = int(raw.get("direct_port_count") or 0)
+                except (TypeError, ValueError):
+                    direct_ports = 0
+                if direct_ports < self.settings.vast_min_direct_ports:
+                    return False
+        return True
+
     async def offers(self) -> list[GpuOffer]:
         query = self._offer_query()
         rows = await self.vast.search_offers(
@@ -75,19 +108,19 @@ class Orchestrator:
             if phase not in {InstancePhase.NONE.value, InstancePhase.ERROR.value}:
                 raise OrchestratorError(f"Instance lifecycle is busy: {phase}")
 
-            # Revalidate the selected offer itself, not merely the top displayed
-            # search results. Vast supports filtering offers by their unique id.
-            exact_query = f"{self._offer_query()} id={int(offer_id)}"
-            current_rows = await self.vast.search_offers(
-                exact_query,
-                1,
+            cached = await self.cached_offer(offer_id)
+            if cached is None:
+                raise OfferUnavailableError("Offer is not in the latest displayed marketplace snapshot")
+
+            offer = await self.vast.find_offer(
+                int(offer_id),
+                policy_query=self._offer_query(),
                 storage_gb=float(self.settings.vast_disk_gb),
             )
-            offer = current_rows[0] if current_rows else None
-            if offer is None or offer.offer_id != int(offer_id):
-                raise OfferUnavailableError("Offer is no longer available or no longer matches the rental policy")
-            if offer.price_per_hour > self.settings.vast_max_price_usd_hour:
-                raise OfferUnavailableError("Offer price exceeds the configured hard maximum")
+            if offer is None:
+                raise OfferUnavailableError("Offer is no longer available")
+            if not self._offer_eligible(offer):
+                raise OfferUnavailableError("Offer no longer matches the configured rental policy")
 
             fish_token = secrets.token_urlsafe(32)
             label = f"VoxPilot-{secrets.token_hex(6)}"
