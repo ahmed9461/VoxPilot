@@ -159,3 +159,12 @@ Temporary Vast instance:
 - public mapped API port
 
 No custom inference gateway is required because the official Fish server already provides health, TTS, and bearer authentication.
+
+
+## Operational recovery details
+
+- A rental always performs a fresh Vast marketplace query immediately before create. The selected offer must still exist in the fresh result set and remain under the configured hard price ceiling.
+- Vast create uses a unique `VoxPilot-<random>` label. If the create response does not expose an instance ID, the controller attempts to reconcile exactly one instance with that label.
+- If the controller restarts while only a pending label is known, recovery searches by that label. When a paid instance is recovered and no billing meter exists yet, the meter is initialized from the cached contracted offer price before readiness probing continues.
+- Provisioning failure changes the lifecycle to ERROR but does not silently destroy the instance unless `VAST_AUTO_DESTROY_ON_PROVISION_FAILURE=true`.
+- The current code baseline passed GitHub Actions on 2026-09-22: bootstrap shell syntax, Python compileall and 14 pytest tests.

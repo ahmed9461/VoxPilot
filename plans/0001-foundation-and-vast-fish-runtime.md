@@ -1,6 +1,6 @@
 # Plan 0001 — Foundation and Vast/Fish Runtime
 
-Status: ACTIVE
+Status: COMPLETE
 Created: 2026-09-22
 
 ## Goal
@@ -106,3 +106,22 @@ Plan 0001 is complete only when:
 - docs match implementation
 - repository status identifies live Vast testing as the next phase
 - no unwanted PixelPilot chat/model code is present
+
+
+## Completion checkpoint — 2026-09-22
+
+Implemented:
+- all Phase A controller foundation items
+- all Phase B Vast lifecycle items
+- all Phase C Fish runtime items
+- all Phase D voice/TTS control items
+- Phase E README, memory/status/progress and CI setup
+
+Validation:
+- GitHub Actions run `35772753349` on commit `958bdb6910f07ab3e2d8260720bde9e6e37f0100` completed successfully.
+- `bash -n scripts/bootstrap_vast.sh`: passed
+- `python -m compileall -q src tests`: passed
+- `pytest -q`: 14 passed
+
+Next phase:
+- live Vast/Fish acceptance and evidence-driven hardening

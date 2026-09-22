@@ -66,3 +66,43 @@ Architecture simplifications resulting from the audit:
 
 Remaining:
 - implement plan 0001 and validate locally/CI before a live Vast test.
+
+
+## 2026-09-22 — Phase 1 implementation completed
+
+Completed:
+- Built the Python controller package and environment configuration.
+- Added owner-only Telegram middleware.
+- Added safe callback/no-op handling and Telegram Rich Message home UI with styled controls.
+- Added local SQLite state/events storage.
+- Added controller-side voice-reference storage with generated internal IDs.
+- Added voice add/list/select/delete Telegram flows.
+- Added Fish-native performance controls and advanced supported sampling settings.
+- Added direct authenticated Fish API client using MessagePack and the pinned official request shape.
+- Added fresh Vast marketplace search, normalized offers, deterministic sorting and cached display snapshots.
+- Added rental-time marketplace revalidation before instance creation.
+- Added unique instance labels and reconciliation for sparse/ambiguous Vast create responses.
+- Added start/stop/destroy lifecycle, restart recovery, billing meter and Cost Guard.
+- Added recovery hardening so a pending-label-recovered paid instance restores a billing meter from the cached contracted offer.
+- Added pinned Fish S2 bootstrap with official Fish server, bearer authentication and model download.
+- Added CI and focused unit tests.
+
+Validation:
+- GitHub Actions run `35772753349` succeeded for commit `958bdb6910f07ab3e2d8260720bde9e6e37f0100`.
+- dependency install: success
+- bootstrap shell syntax: success
+- Python compileall: success
+- pytest: **14 passed in 0.25s**
+
+Review outcome:
+- No Qwen/vLLM/Whisper/chat/persona/prompt subsystem was copied into VoxPilot.
+- Fish emotion handling is model-native tag composition only.
+- Voice samples remain on the durable controller and survive Vast deletion.
+- Vast credentials remain controller-only; the GPU receives only its generated Fish API token and runtime configuration.
+
+Remaining:
+- live Vast rental acceptance
+- real S2 model download/startup timing
+- Arabic voice-clone quality validation
+- real Telegram audio delivery validation
+- stop/start/destroy behavior against a live Vast instance
