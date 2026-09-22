@@ -14,7 +14,7 @@ The project is intentionally focused: it converts text to speech, clones voices 
 - Search Vast.ai live offers and show suitable 24GB+ GPUs.
 - Rent, recover, stop, start, and destroy the current instance.
 - Track estimated active rental cost by the second.
-- Warn about an idle paid GPU through Cost Guard.
+- Warn about an idle paid GPU or an actively billed rental that remains unready through Cost Guard.
 - Use Telegram Rich Messages/styled buttons where supported with classic fallback.
 
 ## Runtime split

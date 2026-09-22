@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
-from voxpilot.bot.callbacks import safe_callback_answer
+from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import main_menu
 from voxpilot.db import Database
 from voxpilot.services.orchestrator import Orchestrator
@@ -40,7 +40,7 @@ def deps() -> tuple[Orchestrator, Database, VoiceStore]:
 async def generate_prompt(callback: CallbackQuery, state: FSMContext) -> None:
     await safe_callback_answer(callback)
     await state.set_state(GenerateState.text)
-    await callback.message.edit_text("📝 أرسل النص الذي تريد تحويله إلى صوت. يمكنك وضع وسوم Fish داخل النص يدويًا أيضًا.")
+    await safe_edit_text(callback.message, "📝 أرسل النص الذي تريد تحويله إلى صوت. يمكنك وضع وسوم Fish داخل النص يدويًا أيضًا.")
 
 
 @router.message(GenerateState.text, F.text)

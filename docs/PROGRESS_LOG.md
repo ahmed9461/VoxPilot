@@ -188,3 +188,40 @@ Current state:
 - paid Vast instance exists and is provisioning
 - do not create another instance while this one is active
 - next evidence needed is either Fish-ready success or the first provisioning/bootstrap failure from this instance
+
+## 2026-09-22 — Plan 0004: first live Fish success and stop-state defects
+
+Observed:
+- One paid Vast instance was already present and tracked at the beginning of plan 0004.
+- GPU checkout, Fish environment setup, and S2 Pro weight download completed. Fish startup then stopped at CUDA error 804; the log did not advance for over twenty minutes and GPU usage stayed idle.
+- Loader tracing showed the image's CUDA compatibility library was selected. Preloading the mounted host driver made PyTorch GPU allocation work on the same RTX 3090. The revised bootstrap restarted Fish on that rental; both models loaded, warmup finished, and authenticated health passed.
+- Direct Arabic neutral TTS returned an MP3 response. A second request using that synthetic sample as reference with the native `[whisper]` tag also returned MP3. This is a protocol smoke test, not user voice quality acceptance or Telegram delivery acceptance.
+- Restarting the controller recovered the same instance, with no duplicate rental.
+- Vast accepted stop before the provider status became stopped. The old controller paused its meter immediately; later Vast reported `actual=exited`, `intended=stopped`, `cur=stopped`, which old recovery classified as an error. The provider is now stopped and the local meter is paused.
+
+Root causes and changes in progress:
+- Bootstrap did not control which `libcuda` Fish loaded and had no early GPU check. Select the host library when present and perform a real CUDA allocation before downloading weights.
+- A failed Fish worker could remain alive after SIGTERM. Wait briefly and force-kill the stale process before replacement.
+- Stop billing was based on request acceptance rather than provider confirmation, and stopped Vast payloads were misnormalized. Poll to confirmed stop and normalize the observed payload.
+- Cost Guard watched only ready idle instances. Warn on active billed non-ready states.
+- An unresolved create label did not prevent a second create. Hold further rentals until reconciliation.
+- Repeated start taps and unchanged Telegram edits could produce duplicate requests or harmless callback errors. Handle no-op paths explicitly.
+
+Validation so far:
+- Direct GPU allocation with the mounted host driver: passed.
+- Fish model warmup and authenticated health on the existing rental: passed.
+- Direct neutral Arabic TTS and synthetic-reference native-tag request: passed.
+- Controller restart inventory: one instance before and after.
+- Local pytest after initial runtime fixes: 24 passed. Final gate is still pending.
+
+Next:
+- Complete focused tests and code review, run full gate, confirm CI on final HEAD, deploy safely to New-VPS, and verify stopped-state recovery and a warm start from the preserved GPU disk.
+- Verify owner-provided voice quality and Telegram audio delivery when the owner exercises those flows. Do not claim them from synthetic API checks.
+
+## 2026-09-23 — Plan 0004 code review checkpoint
+
+Second review found that a failed start could leave phase `provisioning`, making subsequent start taps appear to be no-ops. It now records a retryable error unless Vast actually stopped. The live stop also showed that Vast accepts lifecycle requests before completion, so destroy now waits for two valid inventory snapshots without the instance before clearing the record or finalizing the meter. Restart recovery handles an interrupted owner-requested destroy. Malformed inventory cannot count as absence.
+
+The Fish launch now defaults Loguru to WARNING because pinned Fish logs prompt text at INFO; this still needs a live post-start check. Telegram callback screens use the existing safe edit helper, and voice names are escaped before HTML rendering.
+
+Validation: final local gate passed with **30 pytest tests**, Python compileall, bootstrap `bash -n` on New-VPS, and diff whitespace check. GitHub Actions on the final HEAD, production deployment, and warm-start acceptance remain.

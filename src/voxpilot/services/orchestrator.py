@@ -104,6 +104,11 @@ class Orchestrator:
             self.settings.validate_rent_ready()
             if await self.db.get("instance.id"):
                 raise OrchestratorError("There is already an active instance")
+            # A timed-out or sparse create response may still have produced a
+            # paid instance. Its unique label must be reconciled before any
+            # second create request is allowed.
+            if await self.db.get("instance.pending_label"):
+                raise OrchestratorError("A previous Vast rental is unresolved; reconcile it before renting again")
             phase = await self.db.get("instance.phase", InstancePhase.NONE.value)
             if phase not in {InstancePhase.NONE.value, InstancePhase.ERROR.value}:
                 raise OrchestratorError(f"Instance lifecycle is busy: {phase}")

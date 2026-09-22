@@ -151,14 +151,22 @@ def extract_mapped_port(raw: dict[str, Any], internal_port: int) -> int | None:
 
 
 def _instance_ref(raw: dict[str, Any], *, api_port: int, fallback_id: int = 0) -> InstanceRef:
-    status = str(
-        raw.get("actual_status")
-        or raw.get("intended_status")
-        or raw.get("status")
-        or raw.get("cur_state")
-        or raw.get("state")
-        or "unknown"
-    )
+    actual = str(raw.get("actual_status") or "").lower()
+    intended = str(raw.get("intended_status") or "").lower()
+    current = str(raw.get("cur_state") or "").lower()
+    # Vast reports a successfully stopped container as actual=exited while
+    # intended/cur_state are stopped. It is not a failed instance.
+    if actual == "exited" and intended == "stopped" and current == "stopped":
+        status = "stopped"
+    else:
+        status = str(
+            raw.get("actual_status")
+            or raw.get("intended_status")
+            or raw.get("status")
+            or raw.get("cur_state")
+            or raw.get("state")
+            or "unknown"
+        )
     public_ip = raw.get("public_ipaddr") or raw.get("public_ip") or raw.get("ssh_host")
     instance_id = int(raw.get("id") or raw.get("instance_id") or fallback_id or 0)
     return InstanceRef(

@@ -56,12 +56,12 @@ Provisioning flow:
 3. Vast starts the configured CUDA/PyTorch image.
 4. The on-start command checks out VoxPilot.
 5. `scripts/bootstrap_vast.sh` checks out the pinned Fish Speech source.
-6. Bootstrap prepares the Fish environment and downloads `fishaudio/s2-pro` weights into `/workspace`.
+6. Bootstrap prepares the Fish environment, selects the mounted host `libcuda` when present, verifies a GPU allocation, and downloads `fishaudio/s2-pro` weights into `/workspace`.
 7. Bootstrap launches the official Fish API server on `0.0.0.0:8080` with `--api-key`.
 8. Controller discovers the public mapped port and polls `/v1/health` using the generated bearer token.
 9. When health succeeds, the lifecycle becomes READY.
 
-Stopping the instance pauses active GPU billing in the local meter. Starting it resumes the meter and waits for Fish health again. Destroying it finalizes the local billing snapshot and clears only the temporary runtime state.
+Stopping the instance pauses the local active GPU meter after Vast confirms the stopped state. Starting it resumes the meter and waits for Fish health again. Destroying it finalizes the local billing snapshot and clears the temporary runtime state only after two Vast inventory checks confirm deletion. Stopped instances can continue incurring storage charges.
 
 ## Voice cloning path
 

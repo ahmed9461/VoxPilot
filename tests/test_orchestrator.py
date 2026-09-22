@@ -3,7 +3,7 @@ import pytest
 from voxpilot.config import Settings
 from voxpilot.db import Database
 from voxpilot.domain import GpuOffer
-from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator
+from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator, OrchestratorError
 
 
 def offer(
@@ -112,6 +112,20 @@ async def test_rent_rejects_offer_that_no_longer_matches_policy(tmp_path):
 
     await orch.offers()
     with pytest.raises(OfferUnavailableError):
+        await orch.rent(1)
+
+    assert vast.created is False
+
+
+@pytest.mark.asyncio
+async def test_unresolved_create_blocks_second_rental(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.phase": "error", "instance.pending_label": "VoxPilot-unresolved"})
+    vast = FakeVast()
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+
+    with pytest.raises(OrchestratorError, match="unresolved"):
         await orch.rent(1)
 
     assert vast.created is False

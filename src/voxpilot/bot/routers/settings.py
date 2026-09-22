@@ -5,7 +5,7 @@ from html import escape
 from aiogram import Router
 from aiogram.types import CallbackQuery
 
-from voxpilot.bot.callbacks import safe_callback_answer
+from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import choices_keyboard, emotions_keyboard, tts_settings_keyboard
 from voxpilot.db import Database
 from voxpilot.services.tts_settings import EMOTION_TAGS, load_tts_settings, set_tts_value
@@ -46,14 +46,15 @@ def _settings_text(settings) -> str:
 async def tts_settings(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
     settings = await load_tts_settings(db())
-    await callback.message.edit_text(_settings_text(settings), reply_markup=tts_settings_keyboard())
+    await safe_edit_text(callback.message, _settings_text(settings), reply_markup=tts_settings_keyboard())
 
 
 @router.callback_query(lambda q: q.data == "settings:emotions")
 async def emotions(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
     settings = await load_tts_settings(db())
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🎭 <b>المشاعر والنبرة</b>\n\nاختر أداءً عامًا. ويمكنك أيضًا كتابة وسوم Fish داخل النص يدويًا للتحكم بأجزاء محددة.",
         reply_markup=emotions_keyboard(settings.emotion_key),
     )
@@ -73,7 +74,8 @@ async def set_emotion(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:temperature")
 async def temperature_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🌡 <b>الحرارة</b>\nالقيمة الافتراضية الرسمية 0.8.",
         reply_markup=choices_keyboard("settings:set:temperature", [("0.5", "0.5"), ("0.7", "0.7"), ("0.8 — افتراضي", "0.8"), ("1.0", "1.0")]),
     )
@@ -82,7 +84,8 @@ async def temperature_menu(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:top_p")
 async def top_p_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🎯 <b>Top‑P</b>",
         reply_markup=choices_keyboard("settings:set:top_p", [("0.6", "0.6"), ("0.8 — افتراضي", "0.8"), ("0.9", "0.9"), ("1.0", "1.0")]),
     )
@@ -91,7 +94,8 @@ async def top_p_menu(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:repetition")
 async def repetition_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🔁 <b>منع التكرار</b>",
         reply_markup=choices_keyboard("settings:set:repetition_penalty", [("1.0", "1.0"), ("1.1 — افتراضي", "1.1"), ("1.2", "1.2"), ("1.3", "1.3")]),
     )
@@ -100,7 +104,8 @@ async def repetition_menu(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:chunk")
 async def chunk_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🧩 <b>طول القطعة</b>",
         reply_markup=choices_keyboard("settings:set:chunk_length", [("100", "100"), ("200", "200"), ("300 — افتراضي", "300"), ("500", "500")]),
     )
@@ -109,7 +114,8 @@ async def chunk_menu(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:format")
 async def format_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🎵 <b>صيغة الإخراج</b>",
         reply_markup=choices_keyboard("settings:set:format", [("MP3 — افتراضي", "mp3"), ("WAV", "wav"), ("OPUS", "opus")]),
     )
@@ -118,7 +124,8 @@ async def format_menu(callback: CallbackQuery) -> None:
 @router.callback_query(lambda q: q.data == "settings:max_tokens")
 async def max_tokens_menu(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         "🪙 <b>حد الرموز</b>",
         reply_markup=choices_keyboard("settings:set:max_new_tokens", [("512", "512"), ("1024 — افتراضي", "1024"), ("2048", "2048")]),
     )
@@ -130,7 +137,7 @@ async def toggle_normalize(callback: CallbackQuery) -> None:
     await set_tts_value(db(), "normalize", not settings.normalize)
     await safe_callback_answer(callback, "تم التغيير")
     settings = await load_tts_settings(db())
-    await callback.message.edit_text(_settings_text(settings), reply_markup=tts_settings_keyboard())
+    await safe_edit_text(callback.message, _settings_text(settings), reply_markup=tts_settings_keyboard())
 
 
 @router.callback_query(lambda q: q.data == "settings:seed_random")
@@ -165,4 +172,4 @@ async def set_value(callback: CallbackQuery) -> None:
         return
     await safe_callback_answer(callback, "تم الحفظ")
     settings = await load_tts_settings(db())
-    await callback.message.edit_text(_settings_text(settings), reply_markup=tts_settings_keyboard())
+    await safe_edit_text(callback.message, _settings_text(settings), reply_markup=tts_settings_keyboard())

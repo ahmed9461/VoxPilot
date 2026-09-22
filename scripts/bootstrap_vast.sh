@@ -80,6 +80,23 @@ fi
 
 uv pip install --python "$FISH_PY" "huggingface_hub>=0.30,<2"
 
+# Vast's CUDA image can put a forward-compatibility libcuda ahead of the host
+# driver. That library fails with error 804 on a GeForce GPU even when the host
+# driver can run this CUDA minor version. Use the mounted host driver directly.
+HOST_LIBCUDA=/usr/lib/x86_64-linux-gnu/libcuda.so.1
+if [[ -r "$HOST_LIBCUDA" ]]; then
+  export LD_PRELOAD="$HOST_LIBCUDA${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
+echo "[VoxPilot] checking CUDA before model download..."
+"$FISH_PY" - <<'PY'
+import torch
+
+if not torch.cuda.is_available():
+    raise RuntimeError("CUDA GPU is unavailable")
+torch.ones(1, device="cuda").sum().item()
+PY
+
 CHECKPOINT_DIR="$FISH_ROOT/checkpoints/s2-pro"
 mkdir -p "$CHECKPOINT_DIR"
 
@@ -111,7 +128,20 @@ if [[ "$FISH_HALF" == "1" || "$FISH_HALF" == "true" ]]; then
   ARGS+=(--half)
 fi
 
-pkill -f "tools/api_server.py.*$FISH_API_PORT" 2>/dev/null || true
+FISH_PROCESS_PATTERN="tools/api_server.py.*$FISH_API_PORT"
+pkill -TERM -f "$FISH_PROCESS_PATTERN" 2>/dev/null || true
+for _ in 1 2 3 4 5; do
+  if ! pgrep -f "$FISH_PROCESS_PATTERN" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+# A worker stuck during model initialization may ignore SIGTERM. Do not leave
+# it beside a replacement server consuming RAM or holding the API port.
+pkill -KILL -f "$FISH_PROCESS_PATTERN" 2>/dev/null || true
 
 echo "[VoxPilot] launching official Fish API..."
+# Fish logs prompt structure (including the owner's text) at INFO. Keep error
+# output while avoiding routine speech content in the instance log.
+export LOGURU_LEVEL="${LOGURU_LEVEL:-WARNING}"
 exec "$FISH_PY" "${ARGS[@]}"

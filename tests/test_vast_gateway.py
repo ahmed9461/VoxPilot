@@ -1,6 +1,6 @@
 import pytest
 
-from voxpilot.services.vast_gateway import VastSdkGateway
+from voxpilot.services.vast_gateway import VastError, VastSdkGateway
 
 
 def raw_offer(offer_id: int, price: float = 0.2):
@@ -30,6 +30,9 @@ class FakeClient:
         if isinstance(query, dict):
             return list(self.direct_rows)
         return list(self.fallback_rows)
+
+    def show_instances(self):
+        return list(self.direct_rows)
 
 
 @pytest.mark.asyncio
@@ -75,3 +78,25 @@ async def test_find_offer_falls_back_to_wide_policy_search():
     assert fallback_query == "num_gpus=1 rentable=true"
     assert fallback_limit == 200
     assert fallback_storage == 60.0
+
+
+@pytest.mark.asyncio
+async def test_inventory_confirmation_checks_exact_instance_id():
+    gateway = VastSdkGateway("x")
+    gateway._client = FakeClient(direct_rows=[{"id": 111}, {"id": 222}])
+
+    assert await gateway.instance_exists(222) is True
+    assert await gateway.instance_exists(333) is False
+
+
+@pytest.mark.asyncio
+async def test_malformed_inventory_cannot_confirm_deletion():
+    class MalformedClient:
+        def show_instances(self):
+            return {"error": "temporary"}
+
+    gateway = VastSdkGateway("x")
+    gateway._client = MalformedClient()
+
+    with pytest.raises(VastError, match="invalid"):
+        await gateway.instance_exists(222)

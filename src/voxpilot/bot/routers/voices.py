@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from io import BytesIO
 import logging
+from html import escape
+from io import BytesIO
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from voxpilot.bot.callbacks import safe_callback_answer
+from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import delete_voice_confirm_keyboard, main_menu, voices_keyboard
 from voxpilot.config import Settings
 from voxpilot.db import Database
@@ -45,10 +46,10 @@ async def _show_voices(callback: CallbackQuery) -> None:
     active = next((v.name for v in voices if v.voice_id == active_id), None)
     text = "🗣 <b>الأصوات المحفوظة</b>\n\n"
     if voices:
-        text += f"المحفوظ: <b>{len(voices)}</b>\nالصوت الحالي: <b>{active or 'غير محدد'}</b>"
+        text += f"المحفوظ: <b>{len(voices)}</b>\nالصوت الحالي: <b>{escape(active) if active else 'غير محدد'}</b>"
     else:
         text += "لا يوجد صوت محفوظ بعد."
-    await callback.message.edit_text(text, reply_markup=voices_keyboard(voices, active_id))
+    await safe_edit_text(callback.message, text, reply_markup=voices_keyboard(voices, active_id))
 
 
 @router.callback_query(lambda q: q.data == "voices:list")
@@ -62,7 +63,7 @@ async def add_voice(callback: CallbackQuery, state: FSMContext) -> None:
     await safe_callback_answer(callback)
     await state.clear()
     await state.set_state(VoiceWizard.name)
-    await callback.message.edit_text("➕ <b>إضافة صوت</b>\n\nأرسل اسمًا لهذا الصوت.")
+    await safe_edit_text(callback.message, "➕ <b>إضافة صوت</b>\n\nأرسل اسمًا لهذا الصوت.")
 
 
 @router.message(VoiceWizard.name, F.text)
@@ -165,7 +166,7 @@ async def voice_transcript(message: Message, state: FSMContext) -> None:
     await database.set("voice.active_id", profile.voice_id)
     await database.event("voice.saved", {"voice_id": profile.voice_id, "name": profile.name})
     await state.clear()
-    await message.answer(f"✅ تم حفظ <b>{profile.name}</b> وتعيينه كصوت حالي.", reply_markup=main_menu())
+    await message.answer(f"✅ تم حفظ <b>{escape(profile.name)}</b> وتعيينه كصوت حالي.", reply_markup=main_menu())
 
 
 @router.callback_query(lambda q: q.data and q.data.startswith("voices:select:"))
@@ -190,8 +191,9 @@ async def delete_confirm(callback: CallbackQuery) -> None:
     if profile is None:
         await _show_voices(callback)
         return
-    await callback.message.edit_text(
-        f"⚠️ حذف الصوت <b>{profile.name}</b> نهائيًا من الكنترولر؟",
+    await safe_edit_text(
+        callback.message,
+        f"⚠️ حذف الصوت <b>{escape(profile.name)}</b> نهائيًا من الكنترولر؟",
         reply_markup=delete_voice_confirm_keyboard(voice_id),
     )
 

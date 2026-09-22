@@ -7,7 +7,7 @@ from typing import Any
 from aiogram import Router
 from aiogram.types import CallbackQuery
 
-from voxpilot.bot.callbacks import safe_callback_answer
+from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import destroy_confirm_keyboard, main_menu, offer_confirm_keyboard, offers_keyboard
 from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator
 
@@ -82,7 +82,7 @@ def _billing_lines(billing: Any, *, final: bool = False) -> list[str]:
 @router.callback_query(lambda q: q.data == "servers:search")
 async def search(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback, "جاري التحديث...")
-    await callback.message.edit_text("🔎 أبحث عن عروض مناسبة الآن...")
+    await safe_edit_text(callback.message, "🔎 أبحث عن عروض مناسبة الآن...")
     previous = await orch().db.get("offers.last", [])
     if not isinstance(previous, list):
         previous = []
@@ -90,18 +90,20 @@ async def search(callback: CallbackQuery) -> None:
         offers = await orch().offers()
     except Exception:
         logger.exception("Vast offer search failed")
-        await callback.message.edit_text("❌ تعذر البحث في Vast.ai الآن.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "❌ تعذر البحث في Vast.ai الآن.", reply_markup=main_menu())
         return
     refresh_no = int(await orch().db.get("offers.refresh_serial", 0) or 0) + 1
     await orch().db.set("offers.refresh_serial", refresh_no)
     if not offers:
-        await callback.message.edit_text(
+        await safe_edit_text(
+            callback.message,
             f"🔄 <b>تحديث السوق #{refresh_no}</b>\n\nلا توجد عروض مطابقة للشروط حاليًا.",
             reply_markup=main_menu(),
         )
         return
     note = _refresh_note(previous, offers, refresh_no)
-    await callback.message.edit_text(
+    await safe_edit_text(
+        callback.message,
         f"🧾 <b>العروض المناسبة</b>\n{note}\n"
         f"المطابق الآن: <b>{len(offers)}</b>\n\nاختر عرضًا لمراجعة التفاصيل:",
         reply_markup=offers_keyboard(offers),
@@ -114,7 +116,7 @@ async def offer_details(callback: CallbackQuery) -> None:
     offer = await orch().cached_offer(offer_id)
     await safe_callback_answer(callback)
     if offer is None:
-        await callback.message.edit_text("العرض لم يعد في آخر نتائج البحث.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "العرض لم يعد في آخر نتائج البحث.", reply_markup=main_menu())
         return
     lines = [
         "🖥 <b>تفاصيل العرض</b>",
@@ -128,21 +130,21 @@ async def offer_details(callback: CallbackQuery) -> None:
     if offer.location:
         lines.append(f"الموقع: <b>{escape(offer.location)}</b>")
     lines += ["", "سيُعاد فحص السوق والسعر قبل الاستئجار مباشرة."]
-    await callback.message.edit_text("\n".join(lines), reply_markup=offer_confirm_keyboard(offer_id))
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=offer_confirm_keyboard(offer_id))
 
 
 @router.callback_query(lambda q: q.data and q.data.startswith("servers:rent:"))
 async def rent(callback: CallbackQuery) -> None:
     offer_id = int(callback.data.rsplit(":", 1)[1])
     await safe_callback_answer(callback, "بدء الاستئجار")
-    await callback.message.edit_text("🚀 أعيد فحص العرض ثم أبدأ تجهيز السيرفر...")
+    await safe_edit_text(callback.message, "🚀 أعيد فحص العرض ثم أبدأ تجهيز السيرفر...")
 
     async def progress(_text: str) -> None:
         try:
             state = await orch().current_state(probe_fish=False)
             lines = ["⏳ <b>جاري تجهيز Fish Audio S2 Pro...</b>", "", "يتم تنزيل البيئة والنموذج عند أول تشغيل."]
             lines += _billing_lines(state.get("billing"))
-            await callback.message.edit_text("\n".join(lines))
+            await safe_edit_text(callback.message, "\n".join(lines))
         except Exception:
             pass
 
@@ -154,18 +156,21 @@ async def rent(callback: CallbackQuery) -> None:
             offers = await orch().offers()
         except Exception:
             logger.exception("Vast refresh after unavailable offer failed")
-            await callback.message.edit_text(
+            await safe_edit_text(
+                callback.message,
                 "⚠️ <b>العرض لم يعد متاحًا</b>\n\nلم يتم إنشاء أي سيرفر. حدّث العروض واختر عرضًا آخر.",
                 reply_markup=main_menu(),
             )
             return
         if not offers:
-            await callback.message.edit_text(
+            await safe_edit_text(
+                callback.message,
                 "⚠️ <b>العرض لم يعد متاحًا</b>\n\nلم يتم إنشاء أي سيرفر، ولا توجد عروض مطابقة حاليًا.",
                 reply_markup=main_menu(),
             )
             return
-        await callback.message.edit_text(
+        await safe_edit_text(
+            callback.message,
             "⚠️ <b>العرض تغيّر أو لم يعد متاحًا</b>\n\n"
             "لم يتم إنشاء أي سيرفر ولم يبدأ عداد التكلفة. هذه أحدث العروض المتاحة الآن:",
             reply_markup=offers_keyboard(offers),
@@ -184,12 +189,12 @@ async def rent(callback: CallbackQuery) -> None:
             "إذا تم إنشاء السيرفر بالفعل فسيبقى ظاهرًا حتى تحذفه يدويًا، حتى لا نفقده أو نحذفه بصمت.",
         ]
         lines += _billing_lines(billing)
-        await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+        await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
         return
     state = await orch().current_state(probe_fish=False)
     lines = ["✅ <b>السيرفر جاهز</b>", "", "يمكنك الآن إرسال النص لتوليد الصوت."]
     lines += _billing_lines(state.get("billing"))
-    await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 
 
 @router.callback_query(lambda q: q.data == "servers:status")
@@ -199,10 +204,10 @@ async def status(callback: CallbackQuery) -> None:
         state = await orch().current_state(probe_fish=True)
     except Exception:
         logger.exception("Server status failed")
-        await callback.message.edit_text("❌ تعذر قراءة حالة السيرفر.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "❌ تعذر قراءة حالة السيرفر.", reply_markup=main_menu())
         return
     if not state.get("instance_id"):
-        await callback.message.edit_text("📊 <b>حالة السيرفر</b>\n\nلا يوجد سيرفر حالي.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "📊 <b>حالة السيرفر</b>\n\nلا يوجد سيرفر حالي.", reply_markup=main_menu())
         return
     phase = str(state.get("phase") or "none")
     labels = {
@@ -220,7 +225,7 @@ async def status(callback: CallbackQuery) -> None:
     if isinstance(offer, dict) and offer.get("price_per_hour") is not None:
         lines.append(f"السعر: <b>${float(offer['price_per_hour']):.3f}/ساعة</b>")
     lines += _billing_lines(state.get("billing"))
-    await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 
 
 @router.callback_query(lambda q: q.data == "servers:stop")
@@ -230,34 +235,38 @@ async def stop(callback: CallbackQuery) -> None:
         stopped = await orch().stop_current()
     except Exception:
         logger.exception("Server stop failed")
-        await callback.message.edit_text("❌ تعذر إيقاف السيرفر.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "❌ تعذر إيقاف السيرفر.", reply_markup=main_menu())
         return
     if not stopped:
-        await callback.message.edit_text("لا يوجد سيرفر حالي.", reply_markup=main_menu())
+        state = await orch().current_state(probe_fish=False)
+        text = "السيرفر متوقف بالفعل." if state.get("instance_id") else "لا يوجد سيرفر حالي."
+        await safe_edit_text(callback.message, text, reply_markup=main_menu())
         return
     state = await orch().current_state(probe_fish=False)
     lines = ["⏹ تم إيقاف السيرفر. قد تستمر رسوم التخزين لدى Vast أثناء التوقف."]
     lines += _billing_lines(state.get("billing"))
-    await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 
 
 @router.callback_query(lambda q: q.data == "servers:start")
 async def start_instance(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback, "جاري التشغيل...")
-    await callback.message.edit_text("▶️ جاري تشغيل السيرفر وانتظار Fish...")
+    await safe_edit_text(callback.message, "▶️ جاري تشغيل السيرفر وانتظار Fish...")
     try:
         started = await orch().start_current()
     except Exception:
         logger.exception("Server start failed")
-        await callback.message.edit_text("❌ تعذر تشغيل السيرفر أو لم يصبح Fish جاهزًا.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "❌ تعذر تشغيل السيرفر أو لم يصبح Fish جاهزًا.", reply_markup=main_menu())
         return
     if not started:
-        await callback.message.edit_text("لا يوجد سيرفر حالي.", reply_markup=main_menu())
+        state = await orch().current_state(probe_fish=False)
+        text = "السيرفر يعمل أو جارٍ تشغيله بالفعل." if state.get("instance_id") else "لا يوجد سيرفر حالي."
+        await safe_edit_text(callback.message, text, reply_markup=main_menu())
         return
     state = await orch().current_state(probe_fish=False)
     lines = ["✅ السيرفر جاهز."]
     lines += _billing_lines(state.get("billing"))
-    await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 
 
 @router.callback_query(lambda q: q.data == "servers:destroy_confirm")
@@ -271,7 +280,7 @@ async def destroy_confirm(callback: CallbackQuery) -> None:
     lines = ["⚠️ سيتم حذف السيرفر نهائيًا وإيقافه."]
     lines += _billing_lines(billing)
     lines += ["", "هل أنت متأكد؟"]
-    await callback.message.edit_text("\n".join(lines), reply_markup=destroy_confirm_keyboard())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=destroy_confirm_keyboard())
 
 
 @router.callback_query(lambda q: q.data == "servers:destroy")
@@ -281,12 +290,12 @@ async def destroy(callback: CallbackQuery) -> None:
         destroyed = await orch().destroy_current()
     except Exception:
         logger.exception("Server destroy failed")
-        await callback.message.edit_text("❌ تعذر حذف السيرفر.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "❌ تعذر حذف السيرفر.", reply_markup=main_menu())
         return
     if not destroyed:
-        await callback.message.edit_text("لا يوجد سيرفر حالي.", reply_markup=main_menu())
+        await safe_edit_text(callback.message, "لا يوجد سيرفر حالي.", reply_markup=main_menu())
         return
     billing = await orch().last_billing_snapshot()
     lines = ["🗑 تم حذف السيرفر نهائيًا."]
     lines += _billing_lines(billing, final=True)
-    await callback.message.edit_text("\n".join(lines), reply_markup=main_menu())
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())

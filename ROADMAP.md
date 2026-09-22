@@ -2,7 +2,7 @@
 
 ## Phase 1 — Foundation and first working runtime
 
-Active plan: `plans/0001-foundation-and-vast-fish-runtime.md`
+Completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 Deliver:
 - owner-only Telegram controller
@@ -21,6 +21,8 @@ Deliver:
 - automated tests and CI
 
 ## Phase 2 — Live acceptance and hardening
+
+Active plan: `plans/0004-live-bootstrap-and-acceptance.md`
 
 Only after Phase 1 CI is green:
 - first real Vast rental

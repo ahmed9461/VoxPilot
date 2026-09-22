@@ -192,6 +192,27 @@ class VastSdkGateway:
                 break
         return refs
 
+    async def instance_exists(self, instance_id: int) -> bool:
+        client = self._get_client()
+        try:
+            result = await asyncio.to_thread(client.show_instances)
+        except Exception as exc:
+            raise VastError(f"Vast inventory check failed: {exc}") from exc
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except json.JSONDecodeError as exc:
+                raise VastError("Vast inventory response was invalid") from exc
+        if not isinstance(result, list) and not (
+            isinstance(result, dict)
+            and any(isinstance(result.get(key), list) for key in ("instances", "results"))
+        ):
+            raise VastError("Vast inventory response was invalid")
+        return any(
+            int(row.get("id") or row.get("instance_id") or 0) == int(instance_id)
+            for row in _extract_rows(result, "instances", "results")
+        )
+
     async def start_instance(self, instance_id: int) -> None:
         await self._lifecycle("start_instance", instance_id)
 

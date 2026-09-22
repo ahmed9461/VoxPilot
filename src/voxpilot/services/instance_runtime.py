@@ -149,6 +149,21 @@ class InstanceRuntime:
                 }
             )
 
+        if await self.db.get("instance.phase") == InstancePhase.DESTROYING.value:
+            try:
+                if await self.vast.instance_exists(int(instance_id)):
+                    await self.destroy_current()
+                else:
+                    await asyncio.sleep(2)
+                    if await self.vast.instance_exists(int(instance_id)):
+                        await self.destroy_current()
+                    else:
+                        async with self._control_lock:
+                            await self._finish_destroy(int(instance_id))
+            except Exception as exc:
+                await self.db.event("instance.destroy_recovery_failed", {"instance_id": instance_id, "error": str(exc)})
+            return
+
         try:
             ref = await self.vast.show_instance(int(instance_id))
         except Exception as exc:
@@ -202,8 +217,20 @@ class InstanceRuntime:
             instance_id = await self.db.get("instance.id")
             if not instance_id:
                 return False
+            if await self.db.get("instance.phase") == InstancePhase.STOPPED.value:
+                ref = await self.vast.show_instance(int(instance_id))
+                if ref.status.lower() == "stopped":
+                    return False
             await self.db.set("instance.phase", InstancePhase.STOPPING.value)
             await self.vast.stop_instance(int(instance_id))
+            deadline = time.monotonic() + 120
+            while True:
+                ref = await self.vast.show_instance(int(instance_id))
+                if ref.status.lower() == "stopped":
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeErrorState("Vast did not confirm the stop request within 120 seconds")
+                await asyncio.sleep(min(2.0, self.settings.provision_poll_seconds))
             await pause_billing(self.db)
             await self.db.set("instance.phase", InstancePhase.STOPPED.value)
             await self.db.event("instance.stopped", {"instance_id": instance_id})
@@ -214,10 +241,27 @@ class InstanceRuntime:
             instance_id = await self.db.get("instance.id")
             if not instance_id:
                 return False
+            phase = await self.db.get("instance.phase")
+            if phase in {InstancePhase.BOOTING.value, InstancePhase.PROVISIONING.value}:
+                return False
+            if phase == InstancePhase.READY.value:
+                ref = await self.vast.show_instance(int(instance_id))
+                if ref.status.lower() != "stopped":
+                    return False
+                await pause_billing(self.db)
+                await self.db.set("instance.phase", InstancePhase.STOPPED.value)
             await self.vast.start_instance(int(instance_id))
             await resume_billing(self.db)
             await self.db.set("instance.phase", InstancePhase.BOOTING.value)
-        await self.wait_until_ready(int(instance_id), progress=progress)
+        try:
+            await self.wait_until_ready(int(instance_id), progress=progress)
+        except Exception as exc:
+            if await self.db.get("instance.id") == instance_id:
+                phase = await self.db.get("instance.phase")
+                if phase != InstancePhase.STOPPED.value:
+                    await self.db.set("instance.phase", InstancePhase.ERROR.value)
+                await self.db.event("instance.start_failed", {"instance_id": instance_id, "error": str(exc)})
+            raise
         return True
 
     async def destroy_current(self) -> bool:
@@ -227,22 +271,34 @@ class InstanceRuntime:
                 return False
             await self.db.set("instance.phase", InstancePhase.DESTROYING.value)
             await self.vast.destroy_instance(int(instance_id))
-            billing = await finalize_billing(self.db)
-            await self.db.event("instance.destroyed", {"instance_id": instance_id, "billing": billing})
-            await self.db.set_many(
-                {
-                    "instance.id": None,
-                    "instance.phase": InstancePhase.NONE.value,
-                    "instance.offer": None,
-                    "instance.label": None,
-                    "instance.pending_label": None,
-                    "fish.url": None,
-                    "fish.token": None,
-                    "instance.last_activity_at": None,
-                    "tts.active": False,
-                }
-            )
+            deadline = time.monotonic() + 120
+            absent_checks = 0
+            while absent_checks < 2:
+                absent_checks = 0 if await self.vast.instance_exists(int(instance_id)) else absent_checks + 1
+                if absent_checks >= 2:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeErrorState("Vast did not confirm instance deletion within 120 seconds")
+                await asyncio.sleep(min(2.0, self.settings.provision_poll_seconds))
+            await self._finish_destroy(int(instance_id))
             return True
+
+    async def _finish_destroy(self, instance_id: int) -> None:
+        billing = await finalize_billing(self.db)
+        await self.db.event("instance.destroyed", {"instance_id": instance_id, "billing": billing})
+        await self.db.set_many(
+            {
+                "instance.id": None,
+                "instance.phase": InstancePhase.NONE.value,
+                "instance.offer": None,
+                "instance.label": None,
+                "instance.pending_label": None,
+                "fish.url": None,
+                "fish.token": None,
+                "instance.last_activity_at": None,
+                "tts.active": False,
+            }
+        )
 
     async def last_billing_snapshot(self) -> dict[str, Any] | None:
         return await last_billing_snapshot(self.db)

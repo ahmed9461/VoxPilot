@@ -1,4 +1,4 @@
-from voxpilot.services.vast_models import build_offer_query, extract_mapped_port, normalize_offer
+from voxpilot.services.vast_models import _instance_ref, build_offer_query, extract_mapped_port, normalize_offer
 
 
 def test_offer_query_uses_gb_threshold_and_policy():
@@ -37,3 +37,17 @@ def test_normalize_offer_converts_raw_vram_mb():
 def test_extract_mapped_port_known_shape():
     raw = {"ports": {"8080/tcp": [{"HostPort": "42117"}]}}
     assert extract_mapped_port(raw, 8080) == 42117
+
+
+def test_stopped_vast_container_is_not_reported_as_failed():
+    ref = _instance_ref(
+        {"id": 1, "actual_status": "exited", "intended_status": "stopped", "cur_state": "stopped"},
+        api_port=8080,
+    )
+    assert ref.status == "stopped"
+
+    failed = _instance_ref(
+        {"id": 1, "actual_status": "exited", "intended_status": "running", "cur_state": "exited"},
+        api_port=8080,
+    )
+    assert failed.status == "exited"

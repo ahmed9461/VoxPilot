@@ -115,3 +115,31 @@ Before creating a rental, VoxPilot now resolves the selected offer by:
 The actual create request then uses the selected offer ID with `cancel_unavail=true`.
 
 Reason: two live attempts showed that pre-create text-query membership could false-reject valid-looking offers. The layered method retains price/policy protection while removing dependency on top-result ranking and text parsing.
+
+## 2026-09-22 — Select the mounted host CUDA driver in Fish bootstrap
+
+On the first actual GPU rental, Fish's CUDA 12.6 environment selected the image's forward-compatibility `libcuda` and failed with CUDA error 804 on an RTX 3090. A GPU allocation succeeded when the same environment preloaded the mounted host `libcuda.so.1`. Bootstrap now selects that host driver when it exists and verifies GPU allocation before model download.
+
+Reason: the pinned Fish/PyTorch stack itself works on this rental. Replacing it or renting a second GPU would not address the loader choice demonstrated by the live trace.
+
+## 2026-09-22 — Confirm Vast stop before pausing the meter
+
+Vast accepts a stop request before the container actually stops. Keep the local meter active while stop is pending, and classify `actual=exited` with `intended=stopped` and `cur=stopped` as a successful stop. If confirmation times out, retain the pending phase and active meter for recovery or owner review.
+
+Reason: the first live stop stayed `running` for more than one poll and the old implementation paused billing immediately, then misclassified the final stopped response as an error.
+
+## 2026-09-22 — Hold ambiguous rentals and warn on paid provisioning
+
+Do not issue a second Vast create while an earlier unique pending label remains unresolved. Cost Guard warns once per rental when active billing persists past its threshold before Fish becomes ready; it does not auto-destroy the rental.
+
+Reason: sparse or timed-out create responses can precede a real paid instance, and a provisioning failure can otherwise continue costing money without the idle-only Cost Guard noticing.
+
+## 2026-09-23 — Confirm deletion and recover an interrupted destroy
+
+Keep the controller's instance record and local meter until two successive Vast inventory checks confirm that the instance is absent. If the controller restarts during an owner-requested destroy, reconcile and finish or retry it. Treat malformed inventory as an error, never as proof of deletion.
+
+Reason: the live stop request was accepted before Vast changed state. The same acceptance/completion distinction matters more for destroy because clearing the local record too early could hide a still-billed rental.
+
+## 2026-09-22 — Avoid routine Fish prompt text in logs
+
+Default Fish Loguru output includes the prompt structure at INFO. Launch Fish with `LOGURU_LEVEL=WARNING` unless explicitly overridden in the instance environment. Keep warnings and errors while avoiding routine retention of the owner's speech text in the temporary instance log.

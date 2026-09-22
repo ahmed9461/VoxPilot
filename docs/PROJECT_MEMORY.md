@@ -194,3 +194,17 @@ Live rental attempt #2 showed that an exact text query such as `id=<offer_id>` c
 5. If the provider removes the offer in the final race window, Vast itself rejects creation.
 
 The old text-only exact-ID revalidation rule is superseded by this layered lookup.
+
+## Live Fish CUDA and Vast stop lessons
+
+The first successful rental used an RTX 3090 with NVIDIA driver 535.161.07. Bootstrap downloaded the pinned Fish source, environment, and S2 Pro weights, but Fish startup stalled with CUDA error 804. Loader tracing showed that the CUDA image selected `/usr/local/cuda-12.6/compat/libcuda.so.1` instead of the mounted host driver at `/usr/lib/x86_64-linux-gnu/libcuda.so.1`. On the same rental, loading the host library made PyTorch GPU allocation and Fish model startup work. Bootstrap now selects that host library when present and runs a real CUDA allocation check before downloading model weights. It remains safe to leave the image's normal library choice in place if the mounted host library is absent; the preflight then fails explicitly if CUDA is unusable.
+
+The same live rental reached authenticated Fish health and produced MP3 bytes for Arabic neutral TTS and a request with a synthetic reference sample plus Fish's native `[whisper]` tag. This proves the live API path and request encoding, not the quality of cloning a user-provided voice or Telegram audio delivery.
+
+Vast stop is asynchronous. The provider continued to report `running` after accepting the stop request, then reported `actual_status=exited`, `intended_status=stopped`, and `cur_state=stopped`. Treat that combination as stopped. Pause the local active-rental meter only after Vast confirms the stopped state. A stopped Vast rental preserves its disk but continues storage charges.
+
+Cost Guard must also warn on an actively billed rental that remains in renting, booting, provisioning, stopping, destroying, or error state beyond the configured warning interval. It does not silently destroy a provisioning failure. An unresolved pending create label blocks a second rental until the earlier outcome is reconciled, preventing an ambiguous response from creating duplicate paid instances.
+
+Destroy completion is based on two consecutive provider inventory checks that no longer contain the instance. Until then, retain its controller record and billing meter. If the controller restarts during a confirmed owner-requested destroy, reconcile the provider inventory and finish or retry that destroy. A failed start sets a retryable error phase unless Vast reports the instance stopped.
+
+Pinned Fish logs its prompt structure at INFO, including text sent for speech. Bootstrap defaults the Fish Loguru handler to WARNING so routine owner text is not retained in the instance log while warnings and errors remain visible.
