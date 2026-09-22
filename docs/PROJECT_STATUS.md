@@ -8,9 +8,11 @@ Last updated: 2026-09-22
 
 The Phase 1 controller/runtime foundation is implemented on `main`. The next work is a real Vast rental and end-to-end Fish S2 validation.
 
-## Completed plan
+## Active plan
 
-`plans/0001-foundation-and-vast-fish-runtime.md`
+`plans/0002-live-vast-offer-revalidation.md`
+
+Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Repository state
 
@@ -51,13 +53,11 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-No code blocker is known.
-
-Live provider/model acceptance has not been performed yet. That is intentionally the next phase because it incurs Vast rental cost.
+Live rental attempt #1 exposed an offer-revalidation bug before instance creation: the selected offer could be rejected when it fell outside the top displayed result set. No Vast instance was created and no GPU billing started. Plan 0002 is active to harden exact-ID revalidation and storage-aware pricing.
 
 ## Next action
 
-Perform the first controlled Vast rental:
+Complete plan 0002, deploy the fix to the controller, then retry the first controlled Vast rental:
 1. configure controller secrets in `.env`
 2. run the bot
 3. add one 10–30 second reference voice + exact transcript
