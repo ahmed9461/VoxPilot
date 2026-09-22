@@ -8,9 +8,11 @@ Last updated: 2026-09-22
 
 The Phase 1 controller/runtime foundation is implemented on `main`. The next work is a real Vast rental and end-to-end Fish S2 validation.
 
-## Completed hardening plan
+## Active plan
 
-`plans/0002-live-vast-offer-revalidation.md`
+`plans/0003-robust-vast-rental-revalidation.md`
+
+Previous completed hardening plan: `plans/0002-live-vast-offer-revalidation.md`
 
 Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
@@ -53,18 +55,9 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-No known code blocker remains from live rental attempt #1. The attempt created no Vast instance and started no GPU billing.
+Live rental attempt #2 still false-rejected the selected offer before instance creation after plan 0002. No Vast instance was created and no GPU billing started.
 
-Plan 0002 fixed:
-- exact selected-offer ID revalidation
-- 60 GB storage-aware marketplace pricing
-- specific stale-offer Telegram feedback with a fresh offer list
-
-Validation for fix HEAD `1f37aa13f04932947893f1f0f13da8ff1927ec18`:
-- GitHub Actions run `35776271041`: success
-- bootstrap shell syntax: success
-- compileall: success
-- pytest: **14 passed**
+Plan 0003 is active to replace brittle text-query revalidation with numeric-ID lookup, wide-search fallback, and local policy validation.
 
 ## Next action
 
