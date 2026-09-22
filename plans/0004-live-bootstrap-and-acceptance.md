@@ -25,6 +25,12 @@ Created: 2026-09-22
 - Repair response validation, transient status normalization, and stopped-to-running recovery. Add focused tests, rerun the full gate and CI, then revalidate on the original rental. Keep the existing data and rental throughout.
 - Review also found that a restart during a pending stop could lose stop intent, and a retry after delayed provider startup could send a redundant start request. Cover both with the same lifecycle repair.
 
+## Deployed acceptance checkpoint — 2026-09-23
+
+- Lifecycle follow-up `e226bf0` passed local checks and matching GitHub Actions run `35787451378` with 40 tests. New-VPS is on the same code after a consistent SQLite backup; the service is active and recovered the original rental as `ready` with active billing.
+- Vast inventory has one tracked running rental. Authenticated Fish health, mapped listener, GPU compute process, Arabic MP3 generation, and synthetic-reference `[whisper]` generation passed on the preserved disk. The synthetic prompt marker was absent from the Fish log.
+- Owner voice quality and Telegram delivery need owner-provided input. Live destroy is deferred because the existing working paid rental should not be removed merely to exercise that path. The rental continues to accrue provider charges while running.
+
 ## Work
 
 1. Gain scoped diagnostic access to the existing rental and inspect on-start process, repository checkout, bootstrap logs, environment, disk/cache, Fish processes, and GPU activity. Compare two observations to distinguish slow progress from a stall.

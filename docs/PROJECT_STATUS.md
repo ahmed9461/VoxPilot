@@ -8,7 +8,7 @@ Last updated: 2026-09-23
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-Live checkpoint on 2026-09-23: New-VPS runs `d0c7576205b6048b705fa4961b0d6ef374c3eb41`; `voxpilot.service` is active. The single tracked Vast rental is running again on its preserved disk. Fish authenticated health is ready, the controller phase is `ready`, and the local active meter is running. A warm-start follow-up fix is being tested locally before deployment.
+Live checkpoint on 2026-09-23: New-VPS runs the validated lifecycle code from `e226bf03ab938cf23c45a0284106184598b8eab5`; `voxpilot.service` is active. The single tracked Vast rental is running on its preserved disk. Fish authenticated health is ready, the controller phase is `ready`, and the local active meter is running. A documentation-only checkpoint may advance Git HEAD without changing this runtime code.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -51,15 +51,15 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Validation state
 
-GitHub Actions run `35785635675` for deployed HEAD `d0c7576205b6048b705fa4961b0d6ef374c3eb41` completed successfully:
+GitHub Actions run `35787451378` for deployed code commit `e226bf03ab938cf23c45a0284106184598b8eab5` completed successfully:
 - dependency install: passed
 - `bash -n scripts/bootstrap_vast.sh`: passed
 - `python -m compileall -q src tests`: passed
-- `pytest -q`: **33 passed**
+- `pytest -q`: **40 passed**
 
 ## Current blockers
 
-The warm-start follow-up needs its final local gate, matching CI, and safe New-VPS deployment. User-provided voice quality, Telegram audio delivery, and a live destroy/billing closeout remain unverified.
+The owner has not supplied a voice reference or exercised the Telegram audio flow in this session, so those quality and delivery gates remain open. Live destroy/billing closeout remains untested to preserve the working paid rental; the unit/integration boundary is covered by tests. The rental is currently running and accruing provider charges.
 
 ## Previous next action (superseded by plan 0004)
 
@@ -94,5 +94,7 @@ Wait for the current Vast instance to finish provisioning:
 
 - CI run `35785635675` succeeded for `d0c7576`, and New-VPS was safely fast-forwarded to that commit with a consistent SQLite backup. The original Vast rental stayed tracked and stopped before the warm start.
 - The controller's first warm-start wait expired while Vast still reported stopped. A later accepted start of the same rental reached `running` and Fish health became ready, but the controller restart found a stale local `stopped` phase and could not provision from it. A backed-up, guarded phase reconciliation restored `ready` with an active local meter; one rental remains in inventory.
-- Follow-up code now checks Vast lifecycle `success=false`, treats `actual=exited` with running intent/current state as `starting`, recovers local stopped state when Vast is already starting/running, preserves pending stop across restart, and avoids a redundant start request when Vast is already starting/running. Local tests and CI are pending for this follow-up.
-- Next: finish the follow-up gate and deploy it, verify direct Fish TTS and post-start privacy logging on the current rental, then decide the safest final rental state without deleting this preserved paid instance merely for a destroy test.
+- Follow-up code now checks Vast lifecycle `success=false`, treats `actual=exited` with running intent/current state as `starting`, recovers local stopped state when Vast is already starting/running, preserves pending stop across restart, and avoids a redundant start request when Vast is already starting/running.
+- CI run `35787451378` passed with 40 tests for `e226bf0`; New-VPS was fast-forwarded after a consistent SQLite backup. `.env` metadata and voice count were unchanged. `voxpilot.service` is active with zero restarts and no new application errors in the deployment window.
+- After deployment, provider inventory contained exactly one instance, the tracked rental was `running`, controller phase `ready`, local billing active, authenticated Fish health true, the Fish API port listening, and a GPU compute process present. Direct warm-start Arabic TTS and a synthetic-reference request with `[whisper]` both returned MP3 bytes. The synthetic marker did not appear in the Fish log.
+- Next: obtain a real owner voice/reference transcript and owner Telegram acceptance when available. Keep the current rental until the owner stops or destroys it; do not delete a working paid instance just to exercise the destroy endpoint.
