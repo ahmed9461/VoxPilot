@@ -55,30 +55,15 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-No known code blocker remains from live rental attempts #1/#2. Both failed before instance creation, so no GPU rental billing began.
+No known code blocker is active at this checkpoint.
 
-Plan 0003 replaced brittle text-query validation with:
-- pre-parsed numeric ID lookup
-- wide fresh policy-search fallback up to 200 rows
-- local policy validation before create
-- Vast `cancel_unavail=true` protection for the final race window
-
-Validation for fix HEAD `e0f890749b86fe154c340c8c03ea58b07fd0856a`:
-- GitHub Actions run `35777567902`: success
-- bootstrap shell syntax: success
-- compileall: success
-- pytest: **17 passed**
+Live rental attempt #3 successfully created a Vast instance from an RTX 3090 offer (25 GB VRAM, approximately $0.177/hour) and started the local billing meter. VoxPilot is currently waiting for Fish Audio S2 Pro provisioning/model download to complete.
 
 ## Next action
 
-Deploy the plan 0003 fix to `/opt/VoxPilot`, restart `voxpilot.service`, refresh offers, then retry the controlled Vast rental:
-1. configure controller secrets in `.env`
-2. run the bot
-3. add one 10–30 second reference voice + exact transcript
-4. search Vast offers
-5. rent a suitable 24 GB+ offer
-6. record bootstrap/model-download readiness behavior
-7. generate neutral Arabic speech
-8. test multiple Fish emotion tags
-9. verify stop/start billing behavior
-10. destroy the instance and verify the final billing snapshot
+Wait for the current Vast instance to finish provisioning:
+1. keep the instance running
+2. wait for Fish API readiness
+3. if ready, perform the first real Arabic synthesis
+4. if provisioning fails, inspect the new controller/Vast bootstrap logs without creating another instance
+5. after synthesis, validate emotion tags, stop/start recovery, and final destroy/billing behavior
