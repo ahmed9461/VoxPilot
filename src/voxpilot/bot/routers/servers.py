@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery
 
 from voxpilot.bot.callbacks import safe_callback_answer
 from voxpilot.bot.keyboards import destroy_confirm_keyboard, main_menu, offer_confirm_keyboard, offers_keyboard
-from voxpilot.services.orchestrator import Orchestrator
+from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator
 
 logger = logging.getLogger(__name__)
 router = Router(name="servers")
@@ -148,6 +148,29 @@ async def rent(callback: CallbackQuery) -> None:
 
     try:
         await orch().rent_and_prepare(offer_id, progress=progress)
+    except OfferUnavailableError:
+        logger.info("Selected Vast offer %s disappeared or became ineligible before rental", offer_id)
+        try:
+            offers = await orch().offers()
+        except Exception:
+            logger.exception("Vast refresh after unavailable offer failed")
+            await callback.message.edit_text(
+                "⚠️ <b>العرض لم يعد متاحًا</b>\n\nلم يتم إنشاء أي سيرفر. حدّث العروض واختر عرضًا آخر.",
+                reply_markup=main_menu(),
+            )
+            return
+        if not offers:
+            await callback.message.edit_text(
+                "⚠️ <b>العرض لم يعد متاحًا</b>\n\nلم يتم إنشاء أي سيرفر، ولا توجد عروض مطابقة حاليًا.",
+                reply_markup=main_menu(),
+            )
+            return
+        await callback.message.edit_text(
+            "⚠️ <b>العرض تغيّر أو لم يعد متاحًا</b>\n\n"
+            "لم يتم إنشاء أي سيرفر ولم يبدأ عداد التكلفة. هذه أحدث العروض المتاحة الآن:",
+            reply_markup=offers_keyboard(offers),
+        )
+        return
     except Exception:
         logger.exception("Vast rent/provision failed")
         try:
