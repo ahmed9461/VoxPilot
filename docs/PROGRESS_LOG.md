@@ -106,3 +106,32 @@ Remaining:
 - Arabic voice-clone quality validation
 - real Telegram audio delivery validation
 - stop/start/destroy behavior against a live Vast instance
+
+
+## 2026-09-22 — Live rental attempt #1: precise offer revalidation fix
+
+Observed:
+- User selected RTX 3090 25 GB at about $0.148/hour.
+- Rental failed before instance creation with `Offer is no longer available; refresh the market`.
+- Bot status confirmed there was no current instance, so no GPU rental billing began.
+
+Root cause:
+- Click-time revalidation searched the normal top displayed result set and then looked for the selected ID inside it.
+- Vast search results are a limited/ranked subset, so an offer could still exist while no longer appearing in that top set.
+- Marketplace requests also used the SDK default 5 GB allocated storage for pricing while VoxPilot rents 60 GB.
+
+Fix:
+- Revalidate the selected offer directly with the supported Vast `id=<offer_id>` filter plus all VoxPilot rental policy filters.
+- Use `VAST_DISK_GB` as `storage_gb` for both displayed marketplace prices and exact revalidation.
+- Show a specific unavailable/changed-offer message and fresh offer list instead of the generic provisioning failure.
+
+Validation:
+- Confirmed Vast SDK 1.6.0 supports the `id` offer filter.
+- GitHub Actions run `35776271041` on commit `1f37aa13f04932947893f1f0f13da8ff1927ec18`: success.
+- shell syntax: passed
+- compileall: passed
+- pytest: **14 passed in 1.85s**
+
+Remaining:
+- deploy fix to the controller server
+- retry live rental and continue Fish bootstrap acceptance

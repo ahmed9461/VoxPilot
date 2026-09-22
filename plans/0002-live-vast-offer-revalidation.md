@@ -1,6 +1,6 @@
 # Plan 0002 — Live Vast Offer Revalidation Hardening
 
-Status: ACTIVE
+Status: COMPLETE
 Created: 2026-09-22
 
 ## Trigger
@@ -35,3 +35,16 @@ Make live rental revalidation precise, price-consistent, and user-friendly.
 - tests and compile pass
 - GitHub Actions green on exact HEAD
 - controller can be updated on /opt/VoxPilot and rental retried
+
+
+## Completion checkpoint
+
+Implemented and validated on 2026-09-22.
+
+GitHub Actions:
+- run: `35776271041`
+- head: `1f37aa13f04932947893f1f0f13da8ff1927ec18`
+- conclusion: success
+- pytest: 14 passed
+
+The first live attempt created no Vast instance; deployment of this fix is required before retrying.

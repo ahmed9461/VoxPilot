@@ -168,3 +168,16 @@ No custom inference gateway is required because the official Fish server already
 - If the controller restarts while only a pending label is known, recovery searches by that label. When a paid instance is recovered and no billing meter exists yet, the meter is initialized from the cached contracted offer price before readiness probing continues.
 - Provisioning failure changes the lifecycle to ERROR but does not silently destroy the instance unless `VAST_AUTO_DESTROY_ON_PROVISION_FAILURE=true`.
 - The current code baseline passed GitHub Actions on 2026-09-22: bootstrap shell syntax, Python compileall and 14 pytest tests.
+
+
+## Vast selected-offer revalidation
+
+Live acceptance established that the selected offer must never be revalidated by merely checking whether it still appears in the current top displayed search results.
+
+Current rule:
+- normal offer search uses `VAST_DISK_GB` as Vast SDK allocated storage so `dph_total` reflects the same disk size VoxPilot will rent;
+- click-time rental validation performs an exact `id=<offer_id>` query combined with the full VoxPilot policy;
+- an offer is considered unavailable only when that exact-ID policy query returns no matching row;
+- if exact revalidation fails, no instance is created and Telegram immediately shows a fresh offer list.
+
+This behavior was introduced after live rental attempt #1 falsely rejected an offer using top-result membership.

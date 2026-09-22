@@ -92,3 +92,12 @@ It is an estimate of active rental cost from the contracted hourly rate. Storage
 Do not automatically destroy a rented instance when bootstrap/readiness fails unless the owner explicitly enables that option.
 
 Reason: a failed provisioning attempt may be recoverable, and silent deletion can destroy useful logs/state while the owner is paying for the instance.
+
+
+## 2026-09-22 — Revalidate Vast rental by exact offer ID
+
+Click-time rental validation must query the selected offer ID directly together with the full VoxPilot policy. Do not decide that an offer disappeared merely because it no longer appears in the current top displayed result set.
+
+All marketplace searches and revalidation queries must use the configured rental disk size as Vast's allocated storage input so displayed `dph_total` and rental policy are price-consistent.
+
+Reason: the first live rental attempt exposed a false unavailable result caused by top-result membership, and the prior 5 GB SDK pricing default did not match VoxPilot's 60 GB rental.

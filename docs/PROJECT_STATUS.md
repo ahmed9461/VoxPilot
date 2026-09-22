@@ -8,7 +8,7 @@ Last updated: 2026-09-22
 
 The Phase 1 controller/runtime foundation is implemented on `main`. The next work is a real Vast rental and end-to-end Fish S2 validation.
 
-## Active plan
+## Completed hardening plan
 
 `plans/0002-live-vast-offer-revalidation.md`
 
@@ -53,11 +53,22 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-Live rental attempt #1 exposed an offer-revalidation bug before instance creation: the selected offer could be rejected when it fell outside the top displayed result set. No Vast instance was created and no GPU billing started. Plan 0002 is active to harden exact-ID revalidation and storage-aware pricing.
+No known code blocker remains from live rental attempt #1. The attempt created no Vast instance and started no GPU billing.
+
+Plan 0002 fixed:
+- exact selected-offer ID revalidation
+- 60 GB storage-aware marketplace pricing
+- specific stale-offer Telegram feedback with a fresh offer list
+
+Validation for fix HEAD `1f37aa13f04932947893f1f0f13da8ff1927ec18`:
+- GitHub Actions run `35776271041`: success
+- bootstrap shell syntax: success
+- compileall: success
+- pytest: **14 passed**
 
 ## Next action
 
-Complete plan 0002, deploy the fix to the controller, then retry the first controlled Vast rental:
+Deploy the fix to `/opt/VoxPilot`, restart `voxpilot.service`, refresh offers, then retry the first controlled Vast rental:
 1. configure controller secrets in `.env`
 2. run the bot
 3. add one 10–30 second reference voice + exact transcript
