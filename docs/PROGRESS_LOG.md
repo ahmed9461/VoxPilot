@@ -168,3 +168,23 @@ Remaining:
 - deploy latest main to controller
 - retry live Vast rental
 - continue Fish bootstrap/model acceptance after first successful instance creation
+
+
+## 2026-09-22 — Live rental attempt #3: first successful Vast instance creation
+
+Observed:
+- The plan 0003 rental lookup was deployed to the controller.
+- User selected an RTX 3090 offer with 25 GB VRAM at approximately $0.177/hour.
+- VoxPilot successfully passed rental validation and created a real Vast instance.
+- Telegram immediately switched to Fish Audio S2 Pro provisioning.
+- Local active-rental meter started successfully; first visible checkpoint was about 2 seconds active time and $0.0001 estimated cost.
+
+Significance:
+- The false offer-rejection problem from live attempts #1 and #2 is resolved.
+- Vast instance creation and billing-state initialization are now confirmed working in live use.
+- The project has advanced from marketplace/rental acceptance into real Fish bootstrap/model readiness testing.
+
+Current state:
+- paid Vast instance exists and is provisioning
+- do not create another instance while this one is active
+- next evidence needed is either Fish-ready success or the first provisioning/bootstrap failure from this instance
