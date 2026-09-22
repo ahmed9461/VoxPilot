@@ -8,7 +8,7 @@ Last updated: 2026-09-23
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-At this repair checkpoint, New-VPS runs `120f4ec` and `voxpilot.service` is active. The owner deleted the GPU rental while the generation repair is being completed. A fresh provider inventory returned zero instances; the controller reports phase `none`, no tracked instance, no active meter, and a final billing snapshot. Do not create a replacement rental as part of this repair.
+New-VPS runs repair commit `5229d1f` and `voxpilot.service` is active with zero restarts after deployment. The owner deleted the GPU rental. Fresh provider inventory returned zero instances; the controller reports phase `none`, no tracked instance, no active meter, and a final billing snapshot. Do not create a replacement rental as part of this repair.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -51,13 +51,13 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Validation state
 
-The current repair passes 48 local pytest tests, Python compileall, bootstrap shell syntax, and diff whitespace checks. The Fish privacy patch applies cleanly to the exact pinned upstream commit. CI and New-VPS deployment of this repair remain pending.
+Repair commit `5229d1f` passed 48 local pytest tests, Python compileall, bootstrap shell syntax, and diff whitespace checks. The Fish privacy patch applies cleanly to the exact pinned upstream commit. Matching GitHub Actions run `35794540192` succeeded. New-VPS was fast-forwarded after a consistent SQLite backup; service is active, repository clean, `.env` metadata unchanged, both saved voice profiles present, and no new service errors were counted after deployment. The live controller probes both profiles and confirms durations about 47.7 and 89.8 seconds, so the new guard will reject them until the owner chooses default voice or uploads a shorter reference.
 
 The previous deployed lifecycle baseline `e226bf0` passed GitHub Actions run `35787451378` with 40 tests.
 
 ## Current blockers
 
-The owner exercised Telegram generation. Fish health returned 200 while `/v1/tts` returned 500 with CUDA out of memory. Both saved references exceed 30 seconds. The original voice files remain stored on the controller. Duration validation, a default-voice escape path, clearer status/errors, and suppression of pinned Fish's unconditional prompt visualization are implemented locally and require CI/deployment. The GPU rental is gone; live post-fix synthesis must wait for a new owner-provisioned rental.
+The owner exercised Telegram generation. Fish health returned 200 while `/v1/tts` returned 500 with CUDA out of memory. Both saved references exceed 30 seconds. The original voice files remain stored on the controller. Duration validation, a default-voice escape path, clearer status/errors, and suppression of pinned Fish's unconditional prompt visualization are deployed. The GPU rental is gone; live post-fix synthesis and Fish log privacy must wait for a new owner-provisioned rental.
 
 ## Previous next action (superseded by plan 0004)
 
