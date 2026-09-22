@@ -142,7 +142,7 @@ Reason: the live stop request was accepted before Vast changed state. The same a
 
 ## 2026-09-23 — Wait for Vast running before Fish readiness on start
 
-After requesting a stopped rental to start, poll Vast until it reports `running` or `frozen` before resuming the active GPU meter and probing Fish. A transient `stopped` response during scheduling must not abort startup. If start or Fish readiness later fails, leave a retryable error unless the instance actually stopped or a stop/destroy operation superseded it. Serialize the final ready-state write against stop/destroy so delayed health responses cannot revive a terminating instance.
+After requesting a stopped rental to start, poll Vast until it reports `running` or `frozen` before resuming the active GPU meter and probing Fish. A transient `stopped` response during scheduling must not abort startup, including during controller restart recovery from a persisted `booting` phase. If start or Fish readiness later fails, leave a retryable error unless the instance actually stopped or a stop/destroy operation superseded it. Serialize the final ready-state write against stop/destroy so delayed health responses cannot revive a terminating instance.
 
 Reason: review before the first warm-start test found that the old code could treat the first post-request `stopped` response as a terminal failure even though Vast had only accepted the start request.
 

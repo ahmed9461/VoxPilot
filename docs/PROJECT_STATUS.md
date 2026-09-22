@@ -59,7 +59,7 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-The warm-start timing fix passed the final local gate but needs CI on its resulting HEAD and safe deployment before starting the preserved rental. User-provided voice quality, Telegram audio delivery, and final destroy/billing remain unverified.
+CI succeeded for the warm-start timing fix, but New-VPS still needs the latest code. Restart recovery during a pending warm start is receiving a focused follow-up fix before live startup. User-provided voice quality, Telegram audio delivery, and final destroy/billing remain unverified.
 
 ## Previous next action (superseded by plan 0004)
 
@@ -84,3 +84,8 @@ Wait for the current Vast instance to finish provisioning:
 - GitHub Actions run `35784581217` succeeded for `8cc5bd843f5253ad3fde20af8cfaab26acd7c22c`.
 - New-VPS was fast-forwarded to that commit after a consistent SQLite backup. `.env` kept its mode, size, and modification time. `voxpilot.service` restarted and is active; recovery now recognizes the stopped Vast rental correctly with billing paused. Vast inventory still contains exactly one tracked instance.
 - Before warm start, code review found the transient-stopped start bug. The fix now passes 32 local pytest tests, compileall, bootstrap `bash -n`, and diff whitespace checks; CI and redeployment are next. This checkpoint is not final acceptance.
+
+## Warm-start recovery review — 2026-09-23
+
+- GitHub Actions run `35785316001` succeeded for `d9005e35fd96dba05f4026130ba233d40776747a`.
+- A controller restart during a persisted `booting` phase could still classify a transient provider `stopped` response as final. The follow-up recovery fix passed its local gate: 33 pytest tests, compileall, bootstrap `bash -n`, and diff whitespace check. Confirm CI and deploy that HEAD before warm-starting the preserved instance.

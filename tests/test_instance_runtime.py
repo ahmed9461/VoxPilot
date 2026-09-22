@@ -82,6 +82,36 @@ async def test_recovery_recognizes_stopped_rental_and_pauses_meter(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_recovery_waits_for_pending_boot_instead_of_marking_it_stopped(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.BOOTING.value})
+    await begin_billing(db, 0.2)
+
+    class DelayedVast(FakeVast):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def show_instance(self, instance_id):
+            self.calls += 1
+            return InstanceRef(instance_id, "stopped" if self.calls < 3 else "running")
+
+    vast = DelayedVast()
+    runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
+
+    async def ready(instance_id, progress=None):
+        await db.set("instance.phase", InstancePhase.READY.value)
+
+    runtime.wait_until_ready = ready
+    await runtime.recover_current()
+
+    assert vast.calls >= 3
+    assert await db.get("instance.phase") == InstancePhase.READY.value
+    assert (await billing_snapshot(db))["active"] is True
+
+
+@pytest.mark.asyncio
 async def test_repeated_start_does_not_send_second_vast_request(tmp_path):
     db = Database(tmp_path / "db.sqlite3")
     await db.init()

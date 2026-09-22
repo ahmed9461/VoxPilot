@@ -235,3 +235,9 @@ Before starting the preserved instance, a second lifecycle review found that the
 A focused concurrency test also showed why Fish health must not write `ready` after a stop begins. The final ready transition is now guarded by the same control lock as stop/destroy, with a regression test that pauses health while stop completes.
 
 Follow-up local gate: **32 pytest tests passed**, Python compileall passed, bootstrap `bash -n` passed on New-VPS, and diff whitespace check passed. CI and redeployment remain before the live warm start.
+
+## 2026-09-23 — Pending-boot restart recovery review
+
+GitHub Actions run `35785316001` succeeded for `d9005e35fd96dba05f4026130ba233d40776747a`. Before deploying it and starting the preserved rental, review found the same transient `stopped` response could occur if the controller restarted after a start request but before Vast reported `running`. Recovery previously marked the instance stopped immediately. It now waits for the persisted `booting` operation, resumes billing only after provider running, and records a true stopped or error outcome if that wait fails. A focused regression test reproduces the transient response. Final gate, CI, deployment, and live warm start remain.
+
+Local gate for the recovery follow-up: **33 pytest tests passed**, Python compileall, bootstrap `bash -n`, and diff whitespace check passed. CI and deployment remain.
