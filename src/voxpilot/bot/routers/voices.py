@@ -13,6 +13,7 @@ from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import delete_voice_confirm_keyboard, main_menu, voices_keyboard
 from voxpilot.config import Settings
 from voxpilot.db import Database
+from voxpilot.services.audio_probe import ReferenceAudioError, ReferenceAudioTooLong
 from voxpilot.services.voice_store import VoiceStore
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ async def _show_voices(callback: CallbackQuery) -> None:
     active = next((v.name for v in voices if v.voice_id == active_id), None)
     text = "🗣 <b>الأصوات المحفوظة</b>\n\n"
     if voices:
-        text += f"المحفوظ: <b>{len(voices)}</b>\nالصوت الحالي: <b>{escape(active) if active else 'غير محدد'}</b>"
+        text += f"المحفوظ: <b>{len(voices)}</b>\nالصوت الحالي: <b>{escape(active) if active else 'الافتراضي'}</b>"
     else:
         text += "لا يوجد صوت محفوظ بعد."
     await safe_edit_text(callback.message, text, reply_markup=voices_keyboard(voices, active_id))
@@ -86,7 +87,7 @@ async def _accept_audio(
     mime_type: str,
     filename: str | None,
 ) -> None:
-    _, _, settings = deps()
+    _, store, settings = deps()
     limit = settings.telegram_max_voice_mb * 1024 * 1024
     if file_size and file_size > limit:
         await message.answer(f"العينة أكبر من الحد المسموح ({settings.telegram_max_voice_mb} MB).")
@@ -96,6 +97,17 @@ async def _accept_audio(
     data = buffer.getvalue()
     if not data or len(data) > limit:
         await message.answer("تعذر قبول العينة أو حجمها أكبر من الحد.")
+        return
+    try:
+        await store.validate_audio(data, mime_type, filename)
+    except ReferenceAudioTooLong as exc:
+        await message.answer(
+            f"العينة مدتها نحو {exc.duration_seconds:.0f} ثانية. أرسل مقطعًا لا يتجاوز 30 ثانية، "
+            "ثم اكتب النص المطابق لما قيل فيه."
+        )
+        return
+    except ReferenceAudioError:
+        await message.answer("تعذر قراءة مدة العينة أو تنسيقها. أرسل ملفًا صوتيًا صالحًا.")
         return
     await state.update_data(audio=data, mime_type=mime_type, filename=filename)
     await state.set_state(VoiceWizard.transcript)
@@ -179,6 +191,14 @@ async def select_voice(callback: CallbackQuery) -> None:
         return
     await database.set("voice.active_id", voice_id)
     await safe_callback_answer(callback, "تم اختيار الصوت")
+    await _show_voices(callback)
+
+
+@router.callback_query(lambda q: q.data == "voices:default")
+async def select_default(callback: CallbackQuery) -> None:
+    database, _, _ = deps()
+    await database.set("voice.active_id", None)
+    await safe_callback_answer(callback, "تم اختيار الصوت الافتراضي")
     await _show_voices(callback)
 
 

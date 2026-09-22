@@ -58,6 +58,8 @@ def destroy_confirm_keyboard() -> InlineKeyboardMarkup:
 
 def voices_keyboard(voices: list[VoiceProfile], active_id: str | None) -> InlineKeyboardMarkup:
     rows = []
+    default_marker = "✅ " if active_id is None else ""
+    rows.append([InlineKeyboardButton(text=f"{default_marker}الصوت الافتراضي", callback_data="voices:default")])
     for voice in voices:
         marker = "✅ " if voice.voice_id == active_id else ""
         rows.append([InlineKeyboardButton(text=f"{marker}{voice.name}", callback_data=f"voices:select:{voice.voice_id}")])

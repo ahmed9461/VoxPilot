@@ -28,6 +28,7 @@ Saved reference voices live on the controller, not on the temporary GPU.
 ## Requirements
 
 - Python 3.11+ for the controller.
+- `ffprobe` from FFmpeg on the controller for reference-audio validation.
 - Telegram bot token.
 - Vast.ai API key.
 - A public/reachable copy of this repository for Vast bootstrap, unless a Vast template is configured instead.
@@ -51,6 +52,7 @@ voxpilot
 1. Start the bot and add a voice reference.
 2. Send a 10–30 second voice/audio sample.
 3. Send the exact text spoken in that sample.
+   Existing samples longer than 30 seconds remain saved but cannot be selected for generation; choose the default voice or upload a shorter sample.
 4. Search Vast offers.
 5. Rent and prepare one offer.
 6. Choose emotion/settings if desired.

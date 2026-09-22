@@ -9,7 +9,9 @@ from aiogram.types import CallbackQuery
 
 from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import destroy_confirm_keyboard, main_menu, offer_confirm_keyboard, offers_keyboard
+from voxpilot.services.audio_probe import ReferenceAudioError, ReferenceAudioTooLong
 from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator
+from voxpilot.services.voice_store import VoiceStore
 
 logger = logging.getLogger(__name__)
 router = Router(name="servers")
@@ -214,7 +216,7 @@ async def status(callback: CallbackQuery) -> None:
         "renting": "⏳ جاري الاستئجار",
         "booting": "⏳ جاري التشغيل",
         "provisioning": "⏳ جاري التجهيز",
-        "ready": "✅ جاهز" if state.get("fish_ready") is not False else "⚠️ Fish غير جاهز",
+        "ready": "✅ Fish يستجيب لفحص الصحة" if state.get("fish_ready") is not False else "⚠️ Fish غير جاهز",
         "stopping": "⏳ جاري الإيقاف",
         "stopped": "⏹ متوقف",
         "destroying": "⏳ جاري الحذف",
@@ -224,6 +226,23 @@ async def status(callback: CallbackQuery) -> None:
     offer = state.get("offer")
     if isinstance(offer, dict) and offer.get("price_per_hour") is not None:
         lines.append(f"السعر: <b>${float(offer['price_per_hour']):.3f}/ساعة</b>")
+    if phase == "ready":
+        active_id = await orch().db.get("voice.active_id")
+        if active_id:
+            store = VoiceStore(orch().settings.voice_data_dir)
+            profile = await store.get(str(active_id))
+            if profile is None:
+                lines.append("⚠️ الصوت الحالي غير موجود. اختر صوتًا آخر من «الأصوات».")
+            else:
+                try:
+                    await store.validate_profile(profile)
+                except ReferenceAudioTooLong as exc:
+                    lines.append(
+                        f"⚠️ العينة الحالية نحو {exc.duration_seconds:.0f} ثانية؛ "
+                        "هذا الطول قد يفشل التوليد. استخدم عينة لا تتجاوز 30 ثانية."
+                    )
+                except ReferenceAudioError:
+                    lines.append("⚠️ تعذر فحص العينة الحالية؛ راجعها من «الأصوات».")
     lines += _billing_lines(state.get("billing"))
     await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 

@@ -29,6 +29,10 @@
 - save/load/list/delete
 - metadata survives process restart
 - traversal-like filenames cannot control storage paths
+- decoded duration rejects over-30-second and non-audio files before saving
+- legacy overlong references are rejected before Fish receives a request
+- rejected uploads leave the voice wizard on its audio step
+- default-voice choice remains available when a stored sample is unusable
 
 ### Billing
 - begin
@@ -45,7 +49,10 @@
 
 CI must run:
 - Python compileall on `src` and `scripts`
+- bootstrap shell syntax
 - pytest
+
+When changing the pinned Fish source or bootstrap privacy patch, check that the patch applies to the exact pinned checkout before deployment.
 
 ## Live acceptance
 

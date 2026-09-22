@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 FISH_ROOT="${FISH_ROOT:-$WORKSPACE/fish-speech}"
 FISH_VENV="${FISH_VENV:-$WORKSPACE/fish-venv}"
 HF_HOME="${HF_HOME:-$WORKSPACE/hf-cache}"
@@ -66,6 +67,9 @@ if [[ ! -d "$FISH_ROOT/.git" ]]; then
 fi
 git -C "$FISH_ROOT" fetch --depth 1 origin "$FISH_SPEECH_REF"
 git -C "$FISH_ROOT" reset --hard FETCH_HEAD
+# The pinned Fish revision prints the full reference and target text via
+# Conversation.visualize even when Loguru INFO is disabled.
+git -C "$FISH_ROOT" apply "$SCRIPT_DIR/fish_prompt_privacy.patch"
 
 cd "$FISH_ROOT"
 

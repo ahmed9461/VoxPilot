@@ -1,0 +1,12 @@
+diff --git a/fish_speech/models/text2semantic/inference.py b/fish_speech/models/text2semantic/inference.py
+--- a/fish_speech/models/text2semantic/inference.py
++++ b/fish_speech/models/text2semantic/inference.py
+@@ -673,8 +673 @@ def generate_long(
+-            logger.info("Visualizing prompt structure:")
+-            conversation_gen.visualize(
+-                tokenizer,
+-                merge_audio_tokens=True,
+-                merge_semantic_tokens=True,
+-            )
+-
+             encoded, audio_masks, audio_parts = conversation_gen.encode_for_inference(

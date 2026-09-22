@@ -155,3 +155,15 @@ Default Fish Loguru output includes the prompt structure at INFO. Launch Fish wi
 Check the Vast SDK response body for explicit lifecycle rejection before changing local phase. Treat `actual=exited` with `intended=running` and `cur_state=running` as an in-progress start, and allow a locally stopped controller record to recover an already starting or running provider rental. Do not send a second start request to a provider instance that is already starting or running. Preserve pending stop intent after a controller restart; continue polling or repeat the idempotent stop request until the provider confirms it. Allow five minutes for provider start confirmation before reporting timeout.
 
 Reason: the first live warm start timed out while Vast still appeared stopped, then a later accepted request made the same rental run. Recovery resumed the meter but left the local phase stopped because Fish provisioning rejected that phase. These state transitions must converge without another rental or a silent billing gap.
+
+## 2026-09-23 — Limit decoded voice references and keep legacy files
+
+Validate an uploaded reference's decoded audio duration with `ffprobe` and reject samples longer than 30 seconds before saving them. Recheck existing saved samples before sending them to Fish. Keep old files intact and let the owner explicitly switch to the default voice. The 30-second threshold follows Fish's documented typical 10–30 second samples and prevents the observed 47–90 second references from reaching the 24 GB GPU; it does not claim that all shorter requests will fit.
+
+Reason: the owner saw health 200 while synthesis failed with CUDA out of memory, and file-size-only validation allowed long compressed OGG references.
+
+## 2026-09-23 — Patch pinned Fish prompt visualization
+
+After resetting the pinned Fish source during bootstrap, apply a repository-held patch that removes its unconditional `conversation_gen.visualize(...)` call. Keep Loguru at WARNING and suppress controller `httpx` INFO logging. Verify the patch against the pinned commit and fail bootstrap if it no longer applies.
+
+Reason: the visualizer prints full request text directly to stdout despite the earlier WARNING setting, so that setting alone did not protect prompt text.

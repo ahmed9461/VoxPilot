@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from voxpilot.domain import VoiceProfile
+from voxpilot.services.audio_probe import inspect_reference_bytes, inspect_reference_file
 
 
 _SAFE_EXTENSIONS = {"wav", "mp3", "ogg", "opus", "m4a", "flac", "aac"}
@@ -66,6 +67,13 @@ class VoiceStore:
             filename=filename,
         )
 
+    async def validate_audio(self, audio: bytes, mime_type: str, filename: str | None = None) -> float:
+        extension = safe_extension(filename, mime_type)
+        return await asyncio.to_thread(inspect_reference_bytes, audio, extension, self.root)
+
+    async def validate_profile(self, profile: VoiceProfile) -> float:
+        return await asyncio.to_thread(inspect_reference_file, profile.audio_path)
+
     def _save_sync(self, *, name: str, audio: bytes, reference_text: str, mime_type: str, filename: str | None) -> VoiceProfile:
         display_name = re.sub(r"\s+", " ", name).strip()
         transcript = reference_text.strip()
@@ -75,8 +83,9 @@ class VoiceStore:
             raise ValueError("Reference audio cannot be empty")
         if not transcript:
             raise ValueError("Reference text cannot be empty")
-        voice_id = uuid.uuid4().hex[:16]
         extension = safe_extension(filename, mime_type)
+        inspect_reference_bytes(audio, extension, self.root)
+        voice_id = uuid.uuid4().hex[:16]
         directory = self.root / voice_id
         directory.mkdir(parents=False, exist_ok=False)
         audio_path = directory / f"reference.{extension}"

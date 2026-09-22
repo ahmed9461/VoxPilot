@@ -8,7 +8,7 @@ Last updated: 2026-09-23
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-Live checkpoint on 2026-09-23: New-VPS runs the validated lifecycle code from `e226bf03ab938cf23c45a0284106184598b8eab5`; `voxpilot.service` is active. The single tracked Vast rental is running on its preserved disk. Fish authenticated health is ready, the controller phase is `ready`, and the local active meter is running. A documentation-only checkpoint may advance Git HEAD without changing this runtime code.
+At this repair checkpoint, New-VPS runs `120f4ec` and `voxpilot.service` is active. The owner deleted the GPU rental while the generation repair is being completed. A fresh provider inventory returned zero instances; the controller reports phase `none`, no tracked instance, no active meter, and a final billing snapshot. Do not create a replacement rental as part of this repair.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -51,15 +51,13 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Validation state
 
-GitHub Actions run `35787451378` for deployed code commit `e226bf03ab938cf23c45a0284106184598b8eab5` completed successfully:
-- dependency install: passed
-- `bash -n scripts/bootstrap_vast.sh`: passed
-- `python -m compileall -q src tests`: passed
-- `pytest -q`: **40 passed**
+The current repair passes 48 local pytest tests, Python compileall, bootstrap shell syntax, and diff whitespace checks. The Fish privacy patch applies cleanly to the exact pinned upstream commit. CI and New-VPS deployment of this repair remain pending.
+
+The previous deployed lifecycle baseline `e226bf0` passed GitHub Actions run `35787451378` with 40 tests.
 
 ## Current blockers
 
-The owner has not supplied a voice reference or exercised the Telegram audio flow in this session, so those quality and delivery gates remain open. Live destroy/billing closeout remains untested to preserve the working paid rental; the unit/integration boundary is covered by tests. The rental is currently running and accruing provider charges.
+The owner exercised Telegram generation. Fish health returned 200 while `/v1/tts` returned 500 with CUDA out of memory. Both saved references exceed 30 seconds. The original voice files remain stored on the controller. Duration validation, a default-voice escape path, clearer status/errors, and suppression of pinned Fish's unconditional prompt visualization are implemented locally and require CI/deployment. The GPU rental is gone; live post-fix synthesis must wait for a new owner-provisioned rental.
 
 ## Previous next action (superseded by plan 0004)
 

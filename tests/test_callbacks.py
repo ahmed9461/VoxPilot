@@ -3,6 +3,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.methods import AnswerCallbackQuery, EditMessageText
 
 from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
+from voxpilot.bot.keyboards import voices_keyboard
 
 
 class StaleCallback:
@@ -29,3 +30,8 @@ async def test_expired_callback_is_acknowledged_safely():
 @pytest.mark.asyncio
 async def test_unchanged_callback_screen_is_safe():
     assert await safe_edit_text(UnchangedMessage(), "same screen") is False
+
+
+def test_voice_menu_can_select_default_voice():
+    keyboard = voices_keyboard([], "a" * 16)
+    assert keyboard.inline_keyboard[0][0].callback_data == "voices:default"

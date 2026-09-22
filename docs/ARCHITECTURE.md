@@ -68,11 +68,12 @@ Stopping the instance pauses the local active GPU meter after Vast confirms the 
 ```text
 Owner uploads reference audio
         |
+        +--> controller checks decoded audio duration (30-second maximum)
         +--> controller stores audio + matching transcript
         |
 Owner sends target text
         |
-        +--> load active reference
+        +--> recheck active reference before sending it to Fish
         +--> prepend selected Fish performance tag, if any
         +--> encode official ServeTTSRequest as MessagePack
         +--> POST /v1/tts with Bearer token

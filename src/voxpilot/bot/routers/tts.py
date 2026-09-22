@@ -10,6 +10,8 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
 from voxpilot.bot.keyboards import main_menu
 from voxpilot.db import Database
+from voxpilot.services.audio_probe import ReferenceAudioError, ReferenceAudioTooLong
+from voxpilot.services.fish_client import FishClientError
 from voxpilot.services.orchestrator import Orchestrator
 from voxpilot.services.tts_settings import compose_performance_text, load_tts_settings
 from voxpilot.services.voice_store import VoiceStore
@@ -77,12 +79,24 @@ async def _generate(message: Message, text: str) -> None:
     active_id = await database.get("voice.active_id")
     if active_id:
         profile = await store.get(str(active_id))
-        if profile is not None:
-            try:
-                reference_audio = await store.read_audio(profile)
-                reference_text = profile.reference_text
-            except OSError:
-                logger.exception("Active voice audio is missing")
+        if profile is None:
+            await message.answer("الصوت المحدد غير موجود. افتح «الأصوات» واختر صوتًا آخر أو الصوت الافتراضي.", reply_markup=main_menu())
+            return
+        try:
+            await store.validate_profile(profile)
+            reference_audio = await store.read_audio(profile)
+            reference_text = profile.reference_text
+        except ReferenceAudioTooLong as exc:
+            await message.answer(
+                f"العينة الحالية مدتها نحو {exc.duration_seconds:.0f} ثانية، وهي أطول من حد 30 ثانية لهذا السيرفر. "
+                "افتح «الأصوات» واختر الصوت الافتراضي، أو أضف عينة أقصر مع نصها المطابق.",
+                reply_markup=main_menu(),
+            )
+            return
+        except (ReferenceAudioError, OSError):
+            logger.warning("Active voice audio cannot be read")
+            await message.answer("تعذر قراءة العينة الحالية. اختر صوتًا آخر أو الصوت الافتراضي من «الأصوات».", reply_markup=main_menu())
+            return
 
     status = await message.answer("🎙 جاري توليد الصوت...")
     try:
@@ -92,9 +106,23 @@ async def _generate(message: Message, text: str) -> None:
             reference_audio=reference_audio,
             reference_text=reference_text,
         )
+    except FishClientError as exc:
+        logger.exception("Fish generation failed")
+        if str(exc).startswith("Fish TTS returned HTTP 5"):
+            error_text = (
+                "❌ Fish يستجيب، لكن التوليد فشل داخله. "
+                "إذا استخدمت صوتًا مخصصًا فجرّب عينة أقصر مع نصها المطابق."
+            )
+        else:
+            error_text = "❌ تعذر إكمال طلب التوليد. افحص حالة السيرفر ثم أعد المحاولة."
+        await status.edit_text(
+            error_text,
+            reply_markup=main_menu(),
+        )
+        return
     except Exception:
         logger.exception("TTS generation failed")
-        await status.edit_text("❌ تعذر توليد الصوت. تأكد أن السيرفر جاهز ثم أعد المحاولة.", reply_markup=main_menu())
+        await status.edit_text("❌ تعذر توليد الصوت. راجع إعدادات الصوت ثم أعد المحاولة.", reply_markup=main_menu())
         return
 
     filename = f"voxpilot.{settings.format}"

@@ -31,6 +31,14 @@ Created: 2026-09-22
 - Vast inventory has one tracked running rental. Authenticated Fish health, mapped listener, GPU compute process, Arabic MP3 generation, and synthetic-reference `[whisper]` generation passed on the preserved disk. The synthetic prompt marker was absent from the Fish log.
 - Owner voice quality and Telegram delivery need owner-provided input. Live destroy is deferred because the existing working paid rental should not be removed merely to exercise that path. The rental continues to accrue provider charges while running.
 
+## Owner Telegram generation failure — 2026-09-23
+
+- The owner reported that the server status looked healthy while Telegram generation failed. Controller logs show authenticated Fish `/v1/health` returning 200 but `/v1/tts` returning 500. The live Fish error is CUDA out of memory during those requests.
+- The active saved OGG reference is about 89.8 seconds and another saved reference is about 47.7 seconds. Both exceed Fish S2's documented typical 10–30 second reference length. The active transcript is unusually short for the recording; its match to the audio cannot be inferred. The audio files must remain preserved.
+- Upload and generation paths currently accept references based only on bytes/file size, with no decoded-duration check. The generic Telegram failure text incorrectly suggests Fish is not ready. There is no direct way to select the default, non-cloned voice while a long reference is active.
+- Pinned Fish unconditionally calls `conversation_gen.visualize(...)`, which writes request text to stdout even with Loguru set to WARNING. The current Fish log contains prompt material. The bootstrap patch removes that call; `git apply --check` passed against the actual pinned Fish checkout. The owner is deleting the GPU rental, so its ephemeral logs will be removed with it. Verify no new prompt text appears when a later rental is available.
+- Duration validation for new and existing references, an actionable Telegram message and default-voice choice, and distinct health/generation status are implemented. The owner deleted the GPU rental during this repair. Fresh provider inventory shows zero instances; the controller has no tracked instance or active meter and retains a final billing snapshot. Preserve controller voices/SQLite, complete local and CI gates, and deploy New-VPS without creating another rental. Live short-reference generation and post-patch GPU log acceptance remain pending a future owner rental.
+
 ## Work
 
 1. Gain scoped diagnostic access to the existing rental and inspect on-start process, repository checkout, bootstrap logs, environment, disk/cache, Fish processes, and GPU activity. Compare two observations to distinguish slow progress from a stall.
@@ -42,7 +50,7 @@ Created: 2026-09-22
 
 ## Safety
 
-- Do not rent a second instance while the existing one is repairable.
-- Do not stop or destroy the paid instance just to test a code path.
-- Preserve local data, existing billing metadata, and temporary GPU cache.
+- Do not rent a new instance while the owner is deleting the original.
+- Do not issue a second stop/destroy request while the owner handles deletion.
+- Preserve controller data and billing metadata.
 - Before each meaningful edit, identify the root cause and review the proposed fix against restart, network failure, repeated taps, incomplete Vast responses, and secret handling.
