@@ -140,6 +140,12 @@ Keep the controller's instance record and local meter until two successive Vast 
 
 Reason: the live stop request was accepted before Vast changed state. The same acceptance/completion distinction matters more for destroy because clearing the local record too early could hide a still-billed rental.
 
+## 2026-09-23 — Wait for Vast running before Fish readiness on start
+
+After requesting a stopped rental to start, poll Vast until it reports `running` or `frozen` before resuming the active GPU meter and probing Fish. A transient `stopped` response during scheduling must not abort startup. If start or Fish readiness later fails, leave a retryable error unless the instance actually stopped or a stop/destroy operation superseded it. Serialize the final ready-state write against stop/destroy so delayed health responses cannot revive a terminating instance.
+
+Reason: review before the first warm-start test found that the old code could treat the first post-request `stopped` response as a terminal failure even though Vast had only accepted the start request.
+
 ## 2026-09-22 — Avoid routine Fish prompt text in logs
 
 Default Fish Loguru output includes the prompt structure at INFO. Launch Fish with `LOGURU_LEVEL=WARNING` unless explicitly overridden in the instance environment. Keep warnings and errors while avoiding routine retention of the owner's speech text in the temporary instance log.

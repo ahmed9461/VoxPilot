@@ -61,7 +61,7 @@ Provisioning flow:
 8. Controller discovers the public mapped port and polls `/v1/health` using the generated bearer token.
 9. When health succeeds, the lifecycle becomes READY.
 
-Stopping the instance pauses the local active GPU meter after Vast confirms the stopped state. Starting it resumes the meter and waits for Fish health again. Destroying it finalizes the local billing snapshot and clears the temporary runtime state only after two Vast inventory checks confirm deletion. Stopped instances can continue incurring storage charges.
+Stopping the instance pauses the local active GPU meter after Vast confirms the stopped state. Starting it waits for Vast to report `running` before resuming the meter and probing Fish health. Destroying it finalizes the local billing snapshot and clears the temporary runtime state only after two Vast inventory checks confirm deletion. Stopped instances can continue incurring storage charges.
 
 ## Voice cloning path
 

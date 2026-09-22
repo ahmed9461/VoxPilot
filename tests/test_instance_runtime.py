@@ -6,7 +6,7 @@ import pytest
 from voxpilot.config import Settings
 from voxpilot.db import Database
 from voxpilot.domain import InstancePhase, InstanceRef
-from voxpilot.services.billing import begin_billing, billing_snapshot
+from voxpilot.services.billing import begin_billing, billing_snapshot, pause_billing
 from voxpilot.services.instance_runtime import InstanceRuntime, RuntimeErrorState
 
 
@@ -19,6 +19,7 @@ class FakeVast:
         self.allow_stop = asyncio.Event()
         self.inventory_checked = asyncio.Event()
         self.allow_delete = asyncio.Event()
+        self.running = False
 
     async def stop_instance(self, instance_id):
         self.stop_calls += 1
@@ -36,6 +37,8 @@ class FakeVast:
 
     async def show_instance(self, instance_id):
         self.probe_started.set()
+        if self.running:
+            return InstanceRef(instance_id, "running")
         await self.allow_stop.wait()
         return InstanceRef(instance_id, "stopped")
 
@@ -84,6 +87,7 @@ async def test_repeated_start_does_not_send_second_vast_request(tmp_path):
     await db.init()
     await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
     vast = FakeVast()
+    vast.running = True
     runtime = InstanceRuntime(Settings(), db, vast)
     entered_wait = asyncio.Event()
     finish_wait = asyncio.Event()
@@ -98,6 +102,31 @@ async def test_repeated_start_does_not_send_second_vast_request(tmp_path):
     assert await runtime.start_current() is False
     finish_wait.set()
     assert await starting is True
+    assert vast.start_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_start_waits_for_provider_before_resuming_meter(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
+    await begin_billing(db, 0.2)
+    await pause_billing(db)
+    vast = FakeVast()
+    runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
+
+    async def ready(instance_id, progress=None):
+        await db.set("instance.phase", InstancePhase.READY.value)
+
+    runtime.wait_until_ready = ready
+    starting = asyncio.create_task(runtime.start_current())
+    await vast.probe_started.wait()
+    assert (await billing_snapshot(db))["active"] is False
+
+    vast.running = True
+    vast.allow_stop.set()
+    assert await starting is True
+    assert (await billing_snapshot(db))["active"] is True
     assert vast.start_calls == 1
 
 
@@ -130,6 +159,7 @@ async def test_failed_start_leaves_retryable_error_phase(tmp_path):
     await db.init()
     await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
     vast = FakeVast()
+    vast.running = True
     runtime = InstanceRuntime(Settings(), db, vast)
 
     async def fail_readiness(instance_id, progress=None):
@@ -142,3 +172,49 @@ async def test_failed_start_leaves_retryable_error_phase(tmp_path):
 
     assert await db.get("instance.phase") == InstancePhase.ERROR.value
     assert vast.start_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_readiness_cannot_overwrite_a_concurrent_stop(tmp_path, monkeypatch):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.BOOTING.value, "fish.token": "test"})
+    await begin_billing(db, 0.2)
+    health_started = asyncio.Event()
+    finish_health = asyncio.Event()
+
+    class FakeFish:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def is_ready(self):
+            health_started.set()
+            await finish_health.wait()
+            return True
+
+    class ConcurrentVast(FakeVast):
+        def __init__(self):
+            super().__init__()
+            self.running = True
+
+        async def stop_instance(self, instance_id):
+            self.stop_calls += 1
+            self.running = False
+            self.allow_stop.set()
+
+        async def show_instance(self, instance_id):
+            if self.running:
+                return InstanceRef(instance_id, "running", "127.0.0.1", 8080)
+            return InstanceRef(instance_id, "stopped")
+
+    monkeypatch.setattr("voxpilot.services.instance_runtime.FishClient", FakeFish)
+    runtime = InstanceRuntime(Settings(), db, ConcurrentVast())
+    readiness = asyncio.create_task(runtime.wait_until_ready(123))
+    await health_started.wait()
+
+    assert await runtime.stop_current() is True
+    finish_health.set()
+    with pytest.raises(RuntimeErrorState, match="lifecycle changed"):
+        await readiness
+    assert await db.get("instance.phase") == InstancePhase.STOPPED.value
+    assert (await billing_snapshot(db))["active"] is False

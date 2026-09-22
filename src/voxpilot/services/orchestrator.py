@@ -196,9 +196,15 @@ class Orchestrator:
         except Exception as exc:
             current = await self.db.get("instance.id")
             if current and int(current) == int(result["instance_id"]):
-                await self.db.set("instance.phase", InstancePhase.ERROR.value)
+                phase = await self.db.get("instance.phase")
+                if phase not in {InstancePhase.STOPPING.value, InstancePhase.STOPPED.value, InstancePhase.DESTROYING.value}:
+                    await self.db.set("instance.phase", InstancePhase.ERROR.value)
                 await self.db.event("instance.provision_failed", {"instance_id": current, "error": str(exc)})
-                if self.settings.vast_auto_destroy_on_provision_failure:
+                if self.settings.vast_auto_destroy_on_provision_failure and phase not in {
+                    InstancePhase.STOPPING.value,
+                    InstancePhase.STOPPED.value,
+                    InstancePhase.DESTROYING.value,
+                }:
                     try:
                         await self.runtime.destroy_current()
                     except Exception as destroy_exc:

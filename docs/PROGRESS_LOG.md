@@ -225,3 +225,13 @@ Second review found that a failed start could leave phase `provisioning`, making
 The Fish launch now defaults Loguru to WARNING because pinned Fish logs prompt text at INFO; this still needs a live post-start check. Telegram callback screens use the existing safe edit helper, and voice names are escaped before HTML rendering.
 
 Validation: final local gate passed with **30 pytest tests**, Python compileall, bootstrap `bash -n` on New-VPS, and diff whitespace check. GitHub Actions on the final HEAD, production deployment, and warm-start acceptance remain.
+
+## 2026-09-23 — First plan 0004 deployment and warm-start review
+
+GitHub Actions run `35784581217` succeeded on code HEAD `8cc5bd843f5253ad3fde20af8cfaab26acd7c22c`. After a consistent SQLite backup, New-VPS fast-forwarded to the same commit; `.env` and voice/runtime data were untouched. `voxpilot.service` restarted successfully. Its recovery recognized the original Vast instance as stopped, with the active meter paused and no duplicate rental.
+
+Before starting the preserved instance, a second lifecycle review found that the start path resumed billing immediately and entered Fish readiness polling while Vast could still report `stopped` during scheduling. That could fail a valid start before the GPU was running. The follow-up fix waits for provider `running`/`frozen`, then resumes the meter and probes Fish, while preserving an in-progress stop/destroy phase if operations overlap. Focused tests passed; final gate, CI, redeployment, and live warm start remain.
+
+A focused concurrency test also showed why Fish health must not write `ready` after a stop begins. The final ready transition is now guarded by the same control lock as stop/destroy, with a regression test that pauses health while stop completes.
+
+Follow-up local gate: **32 pytest tests passed**, Python compileall passed, bootstrap `bash -n` passed on New-VPS, and diff whitespace check passed. CI and redeployment remain before the live warm start.

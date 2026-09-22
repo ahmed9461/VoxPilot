@@ -8,7 +8,7 @@ Last updated: 2026-09-23
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-Live checkpoint on 2026-09-22: New-VPS still runs `1c46248558375eb8836100552ae502a0cc2c4d80`; `voxpilot.service` is active. The single tracked Vast rental completed Fish bootstrap after a live CUDA loader repair, passed authenticated health and direct TTS, and is now stopped with the local active meter paused. Plan 0004 fixes are in the working tree and have not yet been deployed.
+Live checkpoint on 2026-09-23: New-VPS runs `8cc5bd843f5253ad3fde20af8cfaab26acd7c22c`; `voxpilot.service` is active. The single tracked Vast rental completed Fish bootstrap after a live CUDA loader repair, passed authenticated health and direct TTS, and is now stopped with the local active meter paused. A warm-start timing fix has been identified in review and is not yet deployed.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -59,7 +59,7 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-Plan 0004 changes need final tests, CI on the resulting HEAD, and safe deployment. The old controller misclassifies the currently stopped rental as `error`; the working-tree fix recognizes Vast's observed stopped payload. User-provided voice quality, Telegram audio delivery, and final destroy/billing remain unverified.
+The warm-start timing fix passed the final local gate but needs CI on its resulting HEAD and safe deployment before starting the preserved rental. User-provided voice quality, Telegram audio delivery, and final destroy/billing remain unverified.
 
 ## Previous next action (superseded by plan 0004)
 
@@ -78,3 +78,9 @@ Wait for the current Vast instance to finish provisioning:
 - A controller restart recovered the same rental as ready without creating a second instance.
 - Vast accepted stop before the provider state changed. The old controller paused billing immediately and later treated Vast's `actual=exited`/`intended=stopped`/`cur=stopped` response as an error. Vast is now stopped, the original rental is preserved, and its local active meter is paused. Storage charges can continue.
 - Plan 0004 changes cover the CUDA loader, stale Fish process cleanup, confirmed stop and status normalization, inventory-confirmed destroy, paid provisioning Cost Guard warnings, unresolved rental guard, repeated-start no-op, failed-start recovery, and safe Telegram no-op edits. The final local gate passed: 30 pytest tests, compileall, bootstrap `bash -n`, and diff whitespace check. Confirm CI on the final HEAD, then update New-VPS and verify warm start from the preserved disk.
+
+## Deployment checkpoint — 2026-09-23
+
+- GitHub Actions run `35784581217` succeeded for `8cc5bd843f5253ad3fde20af8cfaab26acd7c22c`.
+- New-VPS was fast-forwarded to that commit after a consistent SQLite backup. `.env` kept its mode, size, and modification time. `voxpilot.service` restarted and is active; recovery now recognizes the stopped Vast rental correctly with billing paused. Vast inventory still contains exactly one tracked instance.
+- Before warm start, code review found the transient-stopped start bug. The fix now passes 32 local pytest tests, compileall, bootstrap `bash -n`, and diff whitespace checks; CI and redeployment are next. This checkpoint is not final acceptance.

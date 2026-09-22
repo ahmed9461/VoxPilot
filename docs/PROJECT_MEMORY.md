@@ -207,4 +207,6 @@ Cost Guard must also warn on an actively billed rental that remains in renting, 
 
 Destroy completion is based on two consecutive provider inventory checks that no longer contain the instance. Until then, retain its controller record and billing meter. If the controller restarts during a confirmed owner-requested destroy, reconcile the provider inventory and finish or retry that destroy. A failed start sets a retryable error phase unless Vast reports the instance stopped.
 
+Vast start is asynchronous as well. After a start request, wait until the provider reports `running` or `frozen` before resuming the active GPU meter or beginning Fish health polling. A temporary `stopped` response during scheduling is not a failed start. Repeated start taps during boot/provisioning are no-ops; a later readiness failure records an error so the owner can retry. Fish readiness must check the current lifecycle under the control lock before writing `ready`, so a simultaneous stop or destroy cannot be overwritten by a late health response.
+
 Pinned Fish logs its prompt structure at INFO, including text sent for speech. Bootstrap defaults the Fish Loguru handler to WARNING so routine owner text is not retained in the instance log while warnings and errors remain visible.
