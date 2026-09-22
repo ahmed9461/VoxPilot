@@ -135,3 +135,36 @@ Validation:
 Remaining:
 - deploy fix to the controller server
 - retry live rental and continue Fish bootstrap acceptance
+
+
+## 2026-09-22 — Live rental attempt #2: robust Vast selected-offer resolution
+
+Observed:
+- Plan 0002 was deployed successfully.
+- Selecting an offer and pressing rent still returned the specific "offer changed or unavailable" path before instance creation.
+- The freshly rendered marketplace continued to contain visually matching offers.
+- No Vast instance was created, therefore no GPU rental billing began.
+
+Reassessment:
+- The exact text query `id=<offer_id>` remained a brittle dependency.
+- Vast SDK 1.6.0 accepts pre-parsed query dictionaries directly.
+- Vast create-instance itself uses the offer ID returned by search and sends a PUT to `/asks/<offer_id>/`.
+
+Plan 0003 fix:
+- Added dedicated selected-offer lookup in the Vast gateway.
+- First lookup uses a pre-parsed numeric filter: `{"id": {"eq": offer_id}}`.
+- If Vast returns no exact row, VoxPilot performs a fresh policy search up to 200 offers and matches the selected ID locally.
+- The resolved offer is validated locally against VRAM, reliability, total hourly price ceiling, disk capacity, verification, download speed, direct ports, datacenter policy, rentable state, and single-GPU policy.
+- Final create still uses `cancel_unavail=true` to reject a real last-moment availability race.
+- Display/search pricing continues to use the actual configured 60 GB storage amount.
+
+Validation:
+- GitHub Actions run `35777567902` on commit `e0f890749b86fe154c340c8c03ea58b07fd0856a`: success.
+- shell syntax: passed
+- compileall: passed
+- pytest: **17 passed in 0.91s**
+
+Remaining:
+- deploy latest main to controller
+- retry live Vast rental
+- continue Fish bootstrap/model acceptance after first successful instance creation

@@ -1,6 +1,6 @@
 # Plan 0003 — Robust Vast Rental Revalidation
 
-Status: ACTIVE
+Status: COMPLETE
 Created: 2026-09-22
 
 ## Trigger
@@ -42,3 +42,16 @@ Keep price/policy protection without false rejecting every rental.
 ## Completion
 
 The plan is complete when CI is green and the controller can be updated for a third live rental attempt.
+
+
+## Completion checkpoint
+
+Implemented and validated on 2026-09-22.
+
+GitHub Actions:
+- run: `35777567902`
+- head: `e0f890749b86fe154c340c8c03ea58b07fd0856a`
+- conclusion: success
+- pytest: 17 passed
+
+Both prior live attempts created no Vast instance. Deploy this fix before the next rental attempt.

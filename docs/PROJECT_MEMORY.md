@@ -181,3 +181,16 @@ Current rule:
 - if exact revalidation fails, no instance is created and Telegram immediately shows a fresh offer list.
 
 This behavior was introduced after live rental attempt #1 falsely rejected an offer using top-result membership.
+
+
+## Robust selected-offer lookup — supersedes text-only exact query
+
+Live rental attempt #2 showed that an exact text query such as `id=<offer_id>` can still false-reject before creation. The selected-offer rule is now:
+
+1. Query Vast with a pre-parsed numeric ID dictionary so the ID bypasses the text query parser.
+2. If that returns no row, run a fresh policy search up to 200 offers and match the selected ID locally.
+3. Validate the resolved offer locally against all rental policy constraints.
+4. Call create-instance with the original offer ID and `cancel_unavail=true`.
+5. If the provider removes the offer in the final race window, Vast itself rejects creation.
+
+The old text-only exact-ID revalidation rule is superseded by this layered lookup.

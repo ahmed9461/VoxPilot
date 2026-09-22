@@ -101,3 +101,17 @@ Click-time rental validation must query the selected offer ID directly together 
 All marketplace searches and revalidation queries must use the configured rental disk size as Vast's allocated storage input so displayed `dph_total` and rental policy are price-consistent.
 
 Reason: the first live rental attempt exposed a false unavailable result caused by top-result membership, and the prior 5 GB SDK pricing default did not match VoxPilot's 60 GB rental.
+
+
+## 2026-09-22 — Layered numeric Vast offer resolution supersedes text-only ID revalidation
+
+The earlier text-only exact-ID revalidation decision is superseded.
+
+Before creating a rental, VoxPilot now resolves the selected offer by:
+1. a pre-parsed numeric `id` query dictionary;
+2. a wide fresh policy-search fallback with local ID matching;
+3. local validation of all rental policy constraints.
+
+The actual create request then uses the selected offer ID with `cancel_unavail=true`.
+
+Reason: two live attempts showed that pre-create text-query membership could false-reject valid-looking offers. The layered method retains price/policy protection while removing dependency on top-result ranking and text parsing.

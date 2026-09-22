@@ -8,7 +8,7 @@ Last updated: 2026-09-22
 
 The Phase 1 controller/runtime foundation is implemented on `main`. The next work is a real Vast rental and end-to-end Fish S2 validation.
 
-## Active plan
+## Completed hardening plan
 
 `plans/0003-robust-vast-rental-revalidation.md`
 
@@ -55,13 +55,23 @@ GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0
 
 ## Current blockers
 
-Live rental attempt #2 still false-rejected the selected offer before instance creation after plan 0002. No Vast instance was created and no GPU billing started.
+No known code blocker remains from live rental attempts #1/#2. Both failed before instance creation, so no GPU rental billing began.
 
-Plan 0003 is active to replace brittle text-query revalidation with numeric-ID lookup, wide-search fallback, and local policy validation.
+Plan 0003 replaced brittle text-query validation with:
+- pre-parsed numeric ID lookup
+- wide fresh policy-search fallback up to 200 rows
+- local policy validation before create
+- Vast `cancel_unavail=true` protection for the final race window
+
+Validation for fix HEAD `e0f890749b86fe154c340c8c03ea58b07fd0856a`:
+- GitHub Actions run `35777567902`: success
+- bootstrap shell syntax: success
+- compileall: success
+- pytest: **17 passed**
 
 ## Next action
 
-Deploy the fix to `/opt/VoxPilot`, restart `voxpilot.service`, refresh offers, then retry the first controlled Vast rental:
+Deploy the plan 0003 fix to `/opt/VoxPilot`, restart `voxpilot.service`, refresh offers, then retry the controlled Vast rental:
 1. configure controller secrets in `.env`
 2. run the bot
 3. add one 10–30 second reference voice + exact transcript
