@@ -19,6 +19,10 @@ class OrchestratorError(RuntimeError):
     pass
 
 
+class OfferUnavailableError(OrchestratorError):
+    pass
+
+
 class Orchestrator:
     def __init__(self, settings: Settings, db: Database, vast: VastSdkGateway):
         self.settings = settings
@@ -27,8 +31,8 @@ class Orchestrator:
         self.runtime = InstanceRuntime(settings, db, vast)
         self._rent_lock = asyncio.Lock()
 
-    async def offers(self) -> list[GpuOffer]:
-        query = build_offer_query(
+    def _offer_query(self) -> str:
+        return build_offer_query(
             self.settings.vast_min_gpu_ram_gb,
             self.settings.vast_min_reliability,
             self.settings.vast_max_price_usd_hour,
@@ -38,7 +42,14 @@ class Orchestrator:
             min_direct_ports=self.settings.vast_min_direct_ports,
             min_inet_down_mbps=self.settings.vast_min_inet_down_mbps,
         )
-        rows = await self.vast.search_offers(query, self.settings.vast_default_limit)
+
+    async def offers(self) -> list[GpuOffer]:
+        query = self._offer_query()
+        rows = await self.vast.search_offers(
+            query,
+            self.settings.vast_default_limit,
+            storage_gb=float(self.settings.vast_disk_gb),
+        )
         await self.db.set_many(
             {
                 "offers.last": [row.public_dict() for row in rows],
@@ -64,14 +75,19 @@ class Orchestrator:
             if phase not in {InstancePhase.NONE.value, InstancePhase.ERROR.value}:
                 raise OrchestratorError(f"Instance lifecycle is busy: {phase}")
 
-            # Rental is consequential: refresh the marketplace at click time rather
-            # than trusting the snapshot the user saw a few seconds earlier.
-            fresh = await self.offers()
-            offer = next((item for item in fresh if item.offer_id == int(offer_id)), None)
-            if offer is None:
-                raise OrchestratorError("Offer is no longer available; refresh the market")
+            # Revalidate the selected offer itself, not merely the top displayed
+            # search results. Vast supports filtering offers by their unique id.
+            exact_query = f"{self._offer_query()} id={int(offer_id)}"
+            current_rows = await self.vast.search_offers(
+                exact_query,
+                1,
+                storage_gb=float(self.settings.vast_disk_gb),
+            )
+            offer = current_rows[0] if current_rows else None
+            if offer is None or offer.offer_id != int(offer_id):
+                raise OfferUnavailableError("Offer is no longer available or no longer matches the rental policy")
             if offer.price_per_hour > self.settings.vast_max_price_usd_hour:
-                raise OrchestratorError("Offer price exceeds the configured hard maximum")
+                raise OfferUnavailableError("Offer price exceeds the configured hard maximum")
 
             fish_token = secrets.token_urlsafe(32)
             label = f"VoxPilot-{secrets.token_hex(6)}"
