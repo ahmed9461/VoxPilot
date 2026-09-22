@@ -9,6 +9,7 @@ from voxpilot.config import Settings
 from voxpilot.db import Database
 from voxpilot.domain import InstancePhase, TTSSettings
 from voxpilot.services.billing import (
+    begin_billing,
     billing_snapshot,
     finalize_billing,
     last_billing_snapshot,
@@ -135,6 +136,10 @@ class InstanceRuntime:
                 await self.db.event("instance.pending_recovery_unresolved", {"label": pending_label, "count": len(matches)})
                 return
             instance_id = matches[0].instance_id
+            if not await self.db.get("billing.started_at"):
+                offer = await self.db.get("instance.offer")
+                if isinstance(offer, dict) and offer.get("price_per_hour") is not None:
+                    await begin_billing(self.db, float(offer["price_per_hour"]))
             await self.db.set_many(
                 {
                     "instance.id": instance_id,
