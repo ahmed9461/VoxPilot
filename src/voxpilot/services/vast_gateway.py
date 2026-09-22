@@ -33,7 +33,7 @@ class VastSdkGateway:
             self._client = VastAI(api_key=self.api_key, raw=True, quiet=True)
         return self._client
 
-    async def search_offers(self, query: str, limit: int = 8, *, storage_gb: float = 5.0) -> list[GpuOffer]:
+    async def search_offers(self, query: str | dict[str, Any], limit: int = 8, *, storage_gb: float = 5.0) -> list[GpuOffer]:
         client = self._get_client()
         display_limit = max(1, int(limit))
         backend_limit = max(32, min(200, display_limit * 8))
@@ -57,6 +57,57 @@ class VastSdkGateway:
         offers = [offer for offer in offers if offer.offer_id > 0]
         offers.sort(key=lambda x: (x.price_per_hour, -(x.dlperf or 0.0), -(x.inet_down_mbps or 0.0)))
         return offers[:display_limit]
+
+
+    async def find_offer(
+        self,
+        offer_id: int,
+        *,
+        policy_query: str,
+        storage_gb: float,
+    ) -> GpuOffer | None:
+        """Resolve one selected offer without relying on display ranking.
+
+        First use a pre-parsed numeric id filter so the id bypasses Vast's text
+        query parser. If that endpoint returns no row, fall back to a wide fresh
+        policy search and match the id locally. The fallback handles provider/API
+        quirks without weakening price/policy checks in the orchestrator.
+        """
+        client = self._get_client()
+        target_id = int(offer_id)
+
+        async def _search(query, limit: int):
+            try:
+                result = await asyncio.to_thread(
+                    client.search_offers,
+                    query=query,
+                    order="dph_total",
+                    limit=limit,
+                    storage=float(storage_gb),
+                )
+            except Exception as exc:
+                raise VastError(f"Vast selected-offer lookup failed: {exc}") from exc
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    result = []
+            return result if isinstance(result, list) else result.get("offers", []) if isinstance(result, dict) else []
+
+        rows = await _search({"id": {"eq": target_id}}, 4)
+        for row in rows:
+            if isinstance(row, dict):
+                item = normalize_offer(row)
+                if item.offer_id == target_id:
+                    return item
+
+        rows = await _search(policy_query, 200)
+        for row in rows:
+            if isinstance(row, dict):
+                item = normalize_offer(row)
+                if item.offer_id == target_id:
+                    return item
+        return None
 
     async def create_instance(
         self,
