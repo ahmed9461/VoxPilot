@@ -191,6 +191,21 @@ class InstanceRuntime:
         phase = await self.db.get("instance.phase")
         if status in {"running", "frozen", "stopped"}:
             await sync_billing_status(self.db, status)
+        if phase == InstancePhase.STOPPING.value:
+            if status == "stopped":
+                await self.db.set("instance.phase", InstancePhase.STOPPED.value)
+            else:
+                try:
+                    await self.stop_current()
+                except Exception as exc:
+                    await self.db.event("instance.stop_recovery_failed", {"instance_id": instance_id, "error": str(exc)})
+            return
+        if phase == InstancePhase.STOPPED.value and status in {"running", "frozen", "starting"}:
+            async with self._control_lock:
+                if await self.db.get("instance.id") != instance_id or await self.db.get("instance.phase") != InstancePhase.STOPPED.value:
+                    return
+                await self.db.set("instance.phase", InstancePhase.BOOTING.value)
+            phase = InstancePhase.BOOTING.value
         if phase == InstancePhase.BOOTING.value and status not in {"running", "frozen"}:
             try:
                 await self._wait_until_running(int(instance_id))
@@ -267,6 +282,8 @@ class InstanceRuntime:
             instance_id = await self.db.get("instance.id")
             if not instance_id:
                 return False
+            if await self.db.get("instance.phase") == InstancePhase.DESTROYING.value:
+                return False
             if await self.db.get("instance.phase") == InstancePhase.STOPPED.value:
                 ref = await self.vast.show_instance(int(instance_id))
                 if ref.status.lower() == "stopped":
@@ -292,7 +309,13 @@ class InstanceRuntime:
             if not instance_id:
                 return False
             phase = await self.db.get("instance.phase")
-            if phase in {InstancePhase.BOOTING.value, InstancePhase.PROVISIONING.value}:
+            if phase in {
+                InstancePhase.RENTING.value,
+                InstancePhase.BOOTING.value,
+                InstancePhase.PROVISIONING.value,
+                InstancePhase.STOPPING.value,
+                InstancePhase.DESTROYING.value,
+            }:
                 return False
             if phase == InstancePhase.READY.value:
                 ref = await self.vast.show_instance(int(instance_id))
@@ -300,7 +323,9 @@ class InstanceRuntime:
                     return False
                 await pause_billing(self.db)
                 await self.db.set("instance.phase", InstancePhase.STOPPED.value)
-            await self.vast.start_instance(int(instance_id))
+            ref = await self.vast.show_instance(int(instance_id))
+            if ref.status.lower() not in {"running", "frozen", "starting"}:
+                await self.vast.start_instance(int(instance_id))
             await self.db.set("instance.phase", InstancePhase.BOOTING.value)
         try:
             await self._wait_until_running(int(instance_id))
@@ -320,7 +345,7 @@ class InstanceRuntime:
         return True
 
     async def _wait_until_running(self, instance_id: int) -> None:
-        deadline = time.monotonic() + 120
+        deadline = time.monotonic() + 300
         while True:
             if await self.db.get("instance.id") != instance_id:
                 raise RuntimeErrorState("Instance changed while starting")
@@ -333,7 +358,7 @@ class InstanceRuntime:
             if status in {"error", "failed", "dead"}:
                 raise RuntimeErrorState(f"Vast instance entered terminal state: {ref.status}")
             if time.monotonic() >= deadline:
-                raise RuntimeErrorState("Vast did not confirm start within 120 seconds")
+                raise RuntimeErrorState("Vast did not confirm start within 300 seconds")
             await asyncio.sleep(min(2.0, self.settings.provision_poll_seconds))
 
     async def destroy_current(self) -> bool:

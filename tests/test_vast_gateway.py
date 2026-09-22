@@ -100,3 +100,16 @@ async def test_malformed_inventory_cannot_confirm_deletion():
 
     with pytest.raises(VastError, match="invalid"):
         await gateway.instance_exists(222)
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_rejects_provider_success_false():
+    class RejectedClient:
+        def start_instance(self, *, id):
+            return {"success": False, "error": "provider declined"}
+
+    gateway = VastSdkGateway("x")
+    gateway._client = RejectedClient()
+
+    with pytest.raises(VastError, match="rejected"):
+        await gateway.start_instance(222)

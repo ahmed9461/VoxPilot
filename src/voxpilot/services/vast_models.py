@@ -158,6 +158,8 @@ def _instance_ref(raw: dict[str, Any], *, api_port: int, fallback_id: int = 0) -
     # intended/cur_state are stopped. It is not a failed instance.
     if actual == "exited" and intended == "stopped" and current == "stopped":
         status = "stopped"
+    elif actual == "exited" and intended == "running" and current == "running":
+        status = "starting"
     else:
         status = str(
             raw.get("actual_status")

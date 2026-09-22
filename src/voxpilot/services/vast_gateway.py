@@ -225,6 +225,8 @@ class VastSdkGateway:
     async def _lifecycle(self, method: str, instance_id: int) -> None:
         client = self._get_client()
         try:
-            await asyncio.to_thread(getattr(client, method), id=instance_id)
+            response = await asyncio.to_thread(getattr(client, method), id=instance_id)
         except Exception as exc:
             raise VastError(f"Vast {method} failed: {exc}") from exc
+        if isinstance(response, dict) and (response.get("success") is False or response.get("error")):
+            raise VastError(f"Vast {method} was rejected by the provider")

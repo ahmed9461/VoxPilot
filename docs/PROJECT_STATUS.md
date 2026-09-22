@@ -8,7 +8,7 @@ Last updated: 2026-09-23
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-Live checkpoint on 2026-09-23: New-VPS runs `8cc5bd843f5253ad3fde20af8cfaab26acd7c22c`; `voxpilot.service` is active. The single tracked Vast rental completed Fish bootstrap after a live CUDA loader repair, passed authenticated health and direct TTS, and is now stopped with the local active meter paused. A warm-start timing fix has been identified in review and is not yet deployed.
+Live checkpoint on 2026-09-23: New-VPS runs `d0c7576205b6048b705fa4961b0d6ef374c3eb41`; `voxpilot.service` is active. The single tracked Vast rental is running again on its preserved disk. Fish authenticated health is ready, the controller phase is `ready`, and the local active meter is running. A warm-start follow-up fix is being tested locally before deployment.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -51,15 +51,15 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Validation state
 
-GitHub Actions run `35772753349` for HEAD `958bdb6910f07ab3e2d8260720bde9e6e37f0100` completed successfully:
+GitHub Actions run `35785635675` for deployed HEAD `d0c7576205b6048b705fa4961b0d6ef374c3eb41` completed successfully:
 - dependency install: passed
 - `bash -n scripts/bootstrap_vast.sh`: passed
 - `python -m compileall -q src tests`: passed
-- `pytest -q`: **14 passed**
+- `pytest -q`: **33 passed**
 
 ## Current blockers
 
-CI succeeded for the warm-start timing fix, but New-VPS still needs the latest code. Restart recovery during a pending warm start is receiving a focused follow-up fix before live startup. User-provided voice quality, Telegram audio delivery, and final destroy/billing remain unverified.
+The warm-start follow-up needs its final local gate, matching CI, and safe New-VPS deployment. User-provided voice quality, Telegram audio delivery, and a live destroy/billing closeout remain unverified.
 
 ## Previous next action (superseded by plan 0004)
 
@@ -89,3 +89,10 @@ Wait for the current Vast instance to finish provisioning:
 
 - GitHub Actions run `35785316001` succeeded for `d9005e35fd96dba05f4026130ba233d40776747a`.
 - A controller restart during a persisted `booting` phase could still classify a transient provider `stopped` response as final. The follow-up recovery fix passed its local gate: 33 pytest tests, compileall, bootstrap `bash -n`, and diff whitespace check. Confirm CI and deploy that HEAD before warm-starting the preserved instance.
+
+## Live warm start and pending repair — 2026-09-23
+
+- CI run `35785635675` succeeded for `d0c7576`, and New-VPS was safely fast-forwarded to that commit with a consistent SQLite backup. The original Vast rental stayed tracked and stopped before the warm start.
+- The controller's first warm-start wait expired while Vast still reported stopped. A later accepted start of the same rental reached `running` and Fish health became ready, but the controller restart found a stale local `stopped` phase and could not provision from it. A backed-up, guarded phase reconciliation restored `ready` with an active local meter; one rental remains in inventory.
+- Follow-up code now checks Vast lifecycle `success=false`, treats `actual=exited` with running intent/current state as `starting`, recovers local stopped state when Vast is already starting/running, preserves pending stop across restart, and avoids a redundant start request when Vast is already starting/running. Local tests and CI are pending for this follow-up.
+- Next: finish the follow-up gate and deploy it, verify direct Fish TTS and post-start privacy logging on the current rental, then decide the safest final rental state without deleting this preserved paid instance merely for a destroy test.

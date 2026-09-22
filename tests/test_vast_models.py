@@ -51,3 +51,11 @@ def test_stopped_vast_container_is_not_reported_as_failed():
         api_port=8080,
     )
     assert failed.status == "exited"
+
+
+def test_exited_container_with_running_intent_is_still_starting():
+    ref = _instance_ref(
+        {"id": 1, "actual_status": "exited", "intended_status": "running", "cur_state": "running"},
+        api_port=8080,
+    )
+    assert ref.status == "starting"

@@ -82,6 +82,30 @@ async def test_recovery_recognizes_stopped_rental_and_pauses_meter(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_recovery_preserves_pending_stop_until_provider_confirms(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPING.value})
+    await begin_billing(db, 0.2)
+    vast = FakeVast()
+    vast.running = True
+    runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
+
+    recovering = asyncio.create_task(runtime.recover_current())
+    await vast.probe_started.wait()
+    await asyncio.sleep(0)
+    assert await db.get("instance.phase") == InstancePhase.STOPPING.value
+    assert (await billing_snapshot(db))["active"] is True
+
+    vast.running = False
+    vast.allow_stop.set()
+    await recovering
+    assert await db.get("instance.phase") == InstancePhase.STOPPED.value
+    assert (await billing_snapshot(db))["active"] is False
+    assert vast.stop_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_recovery_waits_for_pending_boot_instead_of_marking_it_stopped(tmp_path):
     db = Database(tmp_path / "db.sqlite3")
     await db.init()
@@ -98,6 +122,59 @@ async def test_recovery_waits_for_pending_boot_instead_of_marking_it_stopped(tmp
             return InstanceRef(instance_id, "stopped" if self.calls < 3 else "running")
 
     vast = DelayedVast()
+    runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
+
+    async def ready(instance_id, progress=None):
+        await db.set("instance.phase", InstancePhase.READY.value)
+
+    runtime.wait_until_ready = ready
+    await runtime.recover_current()
+
+    assert vast.calls >= 3
+    assert await db.get("instance.phase") == InstancePhase.READY.value
+    assert (await billing_snapshot(db))["active"] is True
+
+
+@pytest.mark.asyncio
+async def test_recovery_moves_stopped_record_back_to_booting_when_provider_is_running(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
+    await begin_billing(db, 0.2)
+    await pause_billing(db)
+    vast = FakeVast()
+    vast.running = True
+    runtime = InstanceRuntime(Settings(), db, vast)
+
+    async def ready(instance_id, progress=None):
+        assert await db.get("instance.phase") == InstancePhase.BOOTING.value
+        await db.set("instance.phase", InstancePhase.READY.value)
+
+    runtime.wait_until_ready = ready
+    await runtime.recover_current()
+
+    assert await db.get("instance.phase") == InstancePhase.READY.value
+    assert (await billing_snapshot(db))["active"] is True
+
+
+@pytest.mark.asyncio
+async def test_recovery_waits_through_provider_start_transition(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
+    await begin_billing(db, 0.2)
+    await pause_billing(db)
+
+    class StartingVast(FakeVast):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def show_instance(self, instance_id):
+            self.calls += 1
+            return InstanceRef(instance_id, "starting" if self.calls < 3 else "running")
+
+    vast = StartingVast()
     runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
 
     async def ready(instance_id, progress=None):
@@ -132,7 +209,43 @@ async def test_repeated_start_does_not_send_second_vast_request(tmp_path):
     assert await runtime.start_current() is False
     finish_wait.set()
     assert await starting is True
-    assert vast.start_calls == 1
+    assert vast.start_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_start_does_not_reverse_a_pending_stop(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPING.value})
+    vast = FakeVast()
+    runtime = InstanceRuntime(Settings(), db, vast)
+
+    assert await runtime.start_current() is False
+    assert vast.start_calls == 0
+    assert await db.get("instance.phase") == InstancePhase.STOPPING.value
+
+
+@pytest.mark.asyncio
+async def test_rejected_start_keeps_stopped_phase_and_paused_meter(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    await db.set_many({"instance.id": 123, "instance.phase": InstancePhase.STOPPED.value})
+    await begin_billing(db, 0.2)
+    await pause_billing(db)
+
+    class RejectingVast(FakeVast):
+        async def start_instance(self, instance_id):
+            raise RuntimeError("provider rejected start")
+
+        async def show_instance(self, instance_id):
+            return InstanceRef(instance_id, "stopped")
+
+    runtime = InstanceRuntime(Settings(), db, RejectingVast())
+    with pytest.raises(RuntimeError, match="rejected"):
+        await runtime.start_current()
+
+    assert await db.get("instance.phase") == InstancePhase.STOPPED.value
+    assert (await billing_snapshot(db))["active"] is False
 
 
 @pytest.mark.asyncio
@@ -201,7 +314,7 @@ async def test_failed_start_leaves_retryable_error_phase(tmp_path):
         await runtime.start_current()
 
     assert await db.get("instance.phase") == InstancePhase.ERROR.value
-    assert vast.start_calls == 1
+    assert vast.start_calls == 0
 
 
 @pytest.mark.asyncio

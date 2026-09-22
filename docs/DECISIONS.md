@@ -149,3 +149,9 @@ Reason: review before the first warm-start test found that the old code could tr
 ## 2026-09-22 — Avoid routine Fish prompt text in logs
 
 Default Fish Loguru output includes the prompt structure at INFO. Launch Fish with `LOGURU_LEVEL=WARNING` unless explicitly overridden in the instance environment. Keep warnings and errors while avoiding routine retention of the owner's speech text in the temporary instance log.
+
+## 2026-09-23 — Reconcile Vast lifecycle acceptance with provider state
+
+Check the Vast SDK response body for explicit lifecycle rejection before changing local phase. Treat `actual=exited` with `intended=running` and `cur_state=running` as an in-progress start, and allow a locally stopped controller record to recover an already starting or running provider rental. Do not send a second start request to a provider instance that is already starting or running. Preserve pending stop intent after a controller restart; continue polling or repeat the idempotent stop request until the provider confirms it. Allow five minutes for provider start confirmation before reporting timeout.
+
+Reason: the first live warm start timed out while Vast still appeared stopped, then a later accepted request made the same rental run. Recovery resumed the meter but left the local phase stopped because Fish provisioning rejected that phase. These state transitions must converge without another rental or a silent billing gap.

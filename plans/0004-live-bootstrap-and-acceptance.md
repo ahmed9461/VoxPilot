@@ -18,6 +18,13 @@ Created: 2026-09-22
 - Arabic TTS and a synthetic-reference request with `[whisper]` returned MP3 responses. Quality with the owner's own voice and Telegram delivery remain to be accepted.
 - Controller restart recovered the same rental. A live stop exposed asynchronous provider state and the `exited`/`stopped` payload mismatch. The rental is preserved and currently stopped.
 
+## Warm-start finding — 2026-09-23
+
+- The first live warm-start request returned without a provider-running confirmation. The controller timed out after 120 seconds, then recovered a local `stopped` phase while the provider subsequently became `running`. Fish health was ready and the local meter resumed, but recovery refused to enter provisioning from `stopped`, leaving the displayed phase stale.
+- Vast also reports `actual=exited`, `intended=running`, `cur=running` during startup. That is a transition, not a confirmed failure. The Vast SDK lifecycle methods return a response body with `success`; the gateway currently ignores a possible `success=false`.
+- Repair response validation, transient status normalization, and stopped-to-running recovery. Add focused tests, rerun the full gate and CI, then revalidate on the original rental. Keep the existing data and rental throughout.
+- Review also found that a restart during a pending stop could lose stop intent, and a retry after delayed provider startup could send a redundant start request. Cover both with the same lifecycle repair.
+
 ## Work
 
 1. Gain scoped diagnostic access to the existing rental and inspect on-start process, repository checkout, bootstrap logs, environment, disk/cache, Fish processes, and GPU activity. Compare two observations to distinguish slow progress from a stall.
