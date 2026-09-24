@@ -167,3 +167,11 @@ Reason: the owner saw health 200 while synthesis failed with CUDA out of memory,
 After resetting the pinned Fish source during bootstrap, apply a repository-held patch that removes its unconditional `conversation_gen.visualize(...)` call. Keep Loguru at WARNING and suppress controller `httpx` INFO logging. Verify the patch against the pinned commit and fail bootstrap if it no longer applies.
 
 Reason: the visualizer prints full request text directly to stdout despite the earlier WARNING setting, so that setting alone did not protect prompt text.
+
+## 2026-09-24 — Align displayed and rented Vast offers
+
+Search and click-time exact-ID lookup must use the same policy, including `rented=false` and the configured disk size. Filter known policy violations before presenting buttons; fetch a wider pool to refill the visible list. A missing optional response field is not a violation if the matching provider query enforced it. Continue enforcing known violations and the price ceiling locally. After a rejection, omit that offer from the immediate replacement buttons.
+
+A definitive Vast `no_such_ask` response may release the pending create label only after inventory successfully finds no matching instance. An ambiguous create outcome or failed reconciliation retains the label and blocks another rental.
+
+Reason: the 2026-09-24 bot screenshot shows an offer rejected and the same offer cards displayed again. Review of pinned Vast SDK 1.6.0 also found that string and dictionary searches have different implicit `rented` defaults. The precise live rejection reason remains unconfirmed until the repaired controller records it.

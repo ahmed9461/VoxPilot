@@ -18,6 +18,18 @@ class VastError(RuntimeError):
     pass
 
 
+class VastOfferUnavailableError(VastError):
+    pass
+
+
+def _offer_unavailable(response: Any) -> bool:
+    if not isinstance(response, dict) or response.get("success") is not False:
+        return False
+    error = str(response.get("error") or "").lower()
+    message = str(response.get("msg") or "").lower()
+    return error == "no_such_ask" or "no_such_ask" in message
+
+
 class VastSdkGateway:
     def __init__(self, api_key: str, *, fish_api_port: int = 8080):
         self.api_key = api_key
@@ -68,10 +80,9 @@ class VastSdkGateway:
     ) -> GpuOffer | None:
         """Resolve one selected offer without relying on display ranking.
 
-        First use a pre-parsed numeric id filter so the id bypasses Vast's text
-        query parser. If that endpoint returns no row, fall back to a wide fresh
-        policy search and match the id locally. The fallback handles provider/API
-        quirks without weakening price/policy checks in the orchestrator.
+        First combine the policy with a pre-parsed numeric id so the id bypasses
+        Vast's text parser. If that endpoint returns no row, fall back to a wide
+        fresh policy search and match the id locally.
         """
         client = self._get_client()
         target_id = int(offer_id)
@@ -94,7 +105,11 @@ class VastSdkGateway:
                     result = []
             return result if isinstance(result, list) else result.get("offers", []) if isinstance(result, dict) else []
 
-        rows = await _search({"id": {"eq": target_id}}, 4)
+        from vastai.api.query import offers_alias, offers_fields, offers_mult, parse_query
+
+        exact_query = parse_query(policy_query, {}, offers_fields, offers_alias, offers_mult)
+        exact_query["id"] = {"eq": target_id}
+        rows = await _search(exact_query, 4)
         for row in rows:
             if isinstance(row, dict):
                 item = normalize_offer(row)
@@ -141,8 +156,17 @@ class VastSdkGateway:
         try:
             result = await asyncio.to_thread(client.create_instance, **kwargs)
         except Exception as exc:
+            response = getattr(exc, "response", None)
+            if response is not None:
+                try:
+                    if _offer_unavailable(response.json()):
+                        raise VastOfferUnavailableError("Vast offer is no longer available") from exc
+                except (ValueError, TypeError):
+                    pass
             raise VastError(f"Vast create_instance failed: {exc}") from exc
         mapped = _coerce_mapping(result)
+        if _offer_unavailable(mapped):
+            raise VastOfferUnavailableError("Vast offer is no longer available")
         return mapped if mapped else {"result": result}
 
     async def show_instance(self, instance_id: int) -> InstanceRef:

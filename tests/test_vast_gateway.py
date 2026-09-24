@@ -1,6 +1,6 @@
 import pytest
 
-from voxpilot.services.vast_gateway import VastError, VastSdkGateway
+from voxpilot.services.vast_gateway import VastError, VastOfferUnavailableError, VastSdkGateway
 
 
 def raw_offer(offer_id: int, price: float = 0.2):
@@ -50,7 +50,7 @@ async def test_find_offer_uses_numeric_id_query_first():
     assert found is not None
     assert found.offer_id == 123
     query, _, limit, storage = client.calls[0]
-    assert query == {"id": {"eq": 123}}
+    assert query == {"num_gpus": {"eq": "1"}, "rentable": {"eq": True}, "id": {"eq": 123}}
     assert limit == 4
     assert storage == 60.0
     assert len(client.calls) == 1
@@ -113,3 +113,49 @@ async def test_lifecycle_rejects_provider_success_false():
 
     with pytest.raises(VastError, match="rejected"):
         await gateway.start_instance(222)
+
+
+@pytest.mark.asyncio
+async def test_create_reports_definitive_unavailable_offer():
+    class RejectedClient:
+        def create_instance(self, **kwargs):
+            return {"success": False, "error": "no_such_ask", "ask_id": kwargs["id"]}
+
+    gateway = VastSdkGateway("x")
+    gateway._client = RejectedClient()
+
+    with pytest.raises(VastOfferUnavailableError):
+        await gateway.create_instance(123, image="ubuntu:22.04", disk_gb=60)
+
+
+@pytest.mark.asyncio
+async def test_create_reports_unavailable_offer_from_http_error_body():
+    class FailedResponse:
+        def json(self):
+            return {"success": False, "error": "invalid_args", "msg": "no_such_ask: no longer available"}
+
+    class ProviderFailure(Exception):
+        response = FailedResponse()
+
+    class RejectedClient:
+        def create_instance(self, **kwargs):
+            raise ProviderFailure("HTTP 410")
+
+    gateway = VastSdkGateway("x")
+    gateway._client = RejectedClient()
+
+    with pytest.raises(VastOfferUnavailableError):
+        await gateway.create_instance(123, image="ubuntu:22.04", disk_gb=60)
+
+
+@pytest.mark.asyncio
+async def test_create_keeps_other_rejections_distinct_from_unavailable():
+    class RejectedClient:
+        def create_instance(self, **kwargs):
+            return {"success": False, "error": "insufficient_credit"}
+
+    gateway = VastSdkGateway("x")
+    gateway._client = RejectedClient()
+
+    result = await gateway.create_instance(123, image="ubuntu:22.04", disk_gb=60)
+    assert result["error"] == "insufficient_credit"

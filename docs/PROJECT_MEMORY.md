@@ -195,6 +195,12 @@ Live rental attempt #2 showed that an exact text query such as `id=<offer_id>` c
 
 The old text-only exact-ID revalidation rule is superseded by this layered lookup.
 
+## Marketplace consistency and definitive create rejection — 2026-09-24
+
+Vast SDK 1.6.0's string search and pre-parsed dictionary search use different default `rented` filters. VoxPilot now explicitly requests `rented=false` in its policy, combines that policy with the numeric offer ID in the exact lookup, and keeps a wide policy-search fallback. The displayed list is locally checked against the same policy as click-time rental, with a wider fetched pool to replace filtered rows. Absent optional response fields (such as direct port count and download speed) are not treated as contrary evidence when the provider query itself enforces the requirement. Known contradictory values and the hard hourly price cap still reject an offer.
+
+When a selected offer is rejected, the bot omits that ID from the immediate replacement list and records a safe rejection reason. Vast's explicit `no_such_ask` rejection is definitive: after a successful empty inventory reconciliation, clear the pending label and let the owner choose another offer. Preserve the pending label on timeouts, malformed/sparse responses, or failed inventory reconciliation so a possible paid instance cannot be duplicated. These changes passed local tests but have not been exercised against the live controller or a new Vast rental.
+
 ## Live Fish CUDA and Vast stop lessons
 
 The first successful rental used an RTX 3090 with NVIDIA driver 535.161.07. Bootstrap downloaded the pinned Fish source, environment, and S2 Pro weights, but Fish startup stalled with CUDA error 804. Loader tracing showed that the CUDA image selected `/usr/local/cuda-12.6/compat/libcuda.so.1` instead of the mounted host driver at `/usr/lib/x86_64-linux-gnu/libcuda.so.1`. On the same rental, loading the host library made PyTorch GPU allocation and Fish model startup work. Bootstrap now selects that host library when present and runs a real CUDA allocation check before downloading model weights. It remains safe to leave the image's normal library choice in place if the mounted host library is absent; the preflight then fails explicitly if CUDA is unusable.

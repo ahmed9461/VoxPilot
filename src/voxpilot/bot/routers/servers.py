@@ -155,7 +155,7 @@ async def rent(callback: CallbackQuery) -> None:
     except OfferUnavailableError:
         logger.info("Selected Vast offer %s disappeared or became ineligible before rental", offer_id)
         try:
-            offers = await orch().offers()
+            offers = await orch().offers(exclude_offer_ids={offer_id})
         except Exception:
             logger.exception("Vast refresh after unavailable offer failed")
             await safe_edit_text(
@@ -174,7 +174,7 @@ async def rent(callback: CallbackQuery) -> None:
         await safe_edit_text(
             callback.message,
             "⚠️ <b>العرض تغيّر أو لم يعد متاحًا</b>\n\n"
-            "لم يتم إنشاء أي سيرفر ولم يبدأ عداد التكلفة. هذه أحدث العروض المتاحة الآن:",
+            "لم يتم إنشاء أي سيرفر ولم يبدأ عداد التكلفة. استبعدت العرض المرفوض؛ اختر من العروض الأخرى:",
             reply_markup=offers_keyboard(offers),
         )
         return

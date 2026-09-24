@@ -11,7 +11,7 @@ from voxpilot.domain import GpuOffer, InstancePhase, TTSSettings
 from voxpilot.services.billing import begin_billing
 from voxpilot.services.instance_runtime import InstanceRuntime, ProgressCallback
 from voxpilot.services.provisioning import build_onstart_cmd, build_vast_env, extract_instance_id
-from voxpilot.services.vast_gateway import VastSdkGateway
+from voxpilot.services.vast_gateway import VastOfferUnavailableError, VastSdkGateway
 from voxpilot.services.vast_models import build_offer_query
 
 
@@ -43,54 +43,72 @@ class Orchestrator:
             min_inet_down_mbps=self.settings.vast_min_inet_down_mbps,
         )
 
-    def _offer_eligible(self, offer: GpuOffer) -> bool:
+    def _offer_policy_error(self, offer: GpuOffer) -> str | None:
         if offer.offer_id <= 0:
-            return False
+            return "invalid_id"
         if offer.gpu_ram_gb < self.settings.vast_min_gpu_ram_gb:
-            return False
+            return "gpu_ram"
         if offer.price_per_hour <= 0 or offer.price_per_hour > self.settings.vast_max_price_usd_hour:
-            return False
+            return "price_cap"
         if offer.reliability is None or offer.reliability < self.settings.vast_min_reliability:
-            return False
+            return "reliability"
         if offer.disk_space_gb is not None and offer.disk_space_gb < self.settings.vast_disk_gb:
-            return False
+            return "disk_space"
         if self.settings.vast_verified_only and offer.verified is False:
-            return False
-        if self.settings.vast_min_inet_down_mbps > 0 and (offer.inet_down_mbps or 0.0) < self.settings.vast_min_inet_down_mbps:
-            return False
+            return "verified"
+        # The provider search enforces these filters even when an offer row omits
+        # the corresponding optional response field.
+        if (
+            self.settings.vast_min_inet_down_mbps > 0
+            and offer.inet_down_mbps is not None
+            and offer.inet_down_mbps < self.settings.vast_min_inet_down_mbps
+        ):
+            return "inet_down"
 
         raw = offer.raw or {}
         if raw:
             if int(raw.get("num_gpus") or 1) != 1:
-                return False
+                return "num_gpus"
             if raw.get("rentable") is False:
-                return False
-            if self.settings.vast_datacenter_only and not bool(raw.get("datacenter")):
-                return False
-            if self.settings.vast_min_direct_ports > 0:
+                return "rentable"
+            if raw.get("rented") is True:
+                return "rented"
+            if self.settings.vast_datacenter_only and raw.get("hosting_type") is not None and not bool(raw.get("datacenter")):
+                return "datacenter"
+            if self.settings.vast_min_direct_ports > 0 and raw.get("direct_port_count") is not None:
                 try:
                     direct_ports = int(raw.get("direct_port_count") or 0)
                 except (TypeError, ValueError):
                     direct_ports = 0
                 if direct_ports < self.settings.vast_min_direct_ports:
-                    return False
-        return True
+                    return "direct_ports"
+        return None
 
-    async def offers(self) -> list[GpuOffer]:
+    async def offers(self, *, exclude_offer_ids: set[int] | None = None) -> list[GpuOffer]:
         query = self._offer_query()
         rows = await self.vast.search_offers(
             query,
-            self.settings.vast_default_limit,
+            min(200, max(32, self.settings.vast_default_limit * 8)),
             storage_gb=float(self.settings.vast_disk_gb),
         )
+        excluded = exclude_offer_ids or set()
+        eligible: list[GpuOffer] = []
+        rejected: dict[str, int] = {}
+        for row in rows:
+            reason = "previously_rejected" if row.offer_id in excluded else self._offer_policy_error(row)
+            if reason:
+                rejected[reason] = rejected.get(reason, 0) + 1
+            else:
+                eligible.append(row)
+        eligible = eligible[: self.settings.vast_default_limit]
         await self.db.set_many(
             {
-                "offers.last": [row.public_dict() for row in rows],
+                "offers.last": [row.public_dict() for row in eligible],
                 "offers.last_refreshed_at": datetime.now(UTC).isoformat(),
             }
         )
-        await self.db.event("offers.search", {"query": query, "count": len(rows)})
-        return rows
+        await self.db.event("offers.search", {"query": query, "count": len(eligible), "rejected": rejected})
+        return eligible
 
     async def cached_offer(self, offer_id: int) -> GpuOffer | None:
         rows = await self.db.get("offers.last", [])
@@ -115,6 +133,7 @@ class Orchestrator:
 
             cached = await self.cached_offer(offer_id)
             if cached is None:
+                await self.db.event("instance.offer_rejected", {"offer_id": offer_id, "reason": "not_in_snapshot"})
                 raise OfferUnavailableError("Offer is not in the latest displayed marketplace snapshot")
 
             offer = await self.vast.find_offer(
@@ -123,8 +142,11 @@ class Orchestrator:
                 storage_gb=float(self.settings.vast_disk_gb),
             )
             if offer is None:
+                await self.db.event("instance.offer_rejected", {"offer_id": offer_id, "reason": "lookup_miss"})
                 raise OfferUnavailableError("Offer is no longer available")
-            if not self._offer_eligible(offer):
+            policy_error = self._offer_policy_error(offer)
+            if policy_error:
+                await self.db.event("instance.offer_rejected", {"offer_id": offer_id, "reason": policy_error})
                 raise OfferUnavailableError("Offer no longer matches the configured rental policy")
 
             fish_token = secrets.token_urlsafe(32)
@@ -157,8 +179,10 @@ class Orchestrator:
 
             instance_id = extract_instance_id(result or {})
             if not instance_id:
+                reconciled_inventory = False
                 try:
                     matches = await self.vast.find_instances_by_label(label)
+                    reconciled_inventory = True
                 except Exception as exc:
                     matches = []
                     await self.db.event("instance.reconcile_failed", {"label": label, "error": str(exc)})
@@ -167,6 +191,18 @@ class Orchestrator:
                     await self.db.event("instance.reconciled", {"instance_id": instance_id, "label": label})
 
             if not instance_id:
+                if isinstance(create_error, VastOfferUnavailableError) and reconciled_inventory and not matches:
+                    await self.db.set_many(
+                        {
+                            "instance.phase": InstancePhase.NONE.value,
+                            "instance.pending_label": None,
+                            "instance.offer": None,
+                            "fish.token": None,
+                            "fish.url": None,
+                        }
+                    )
+                    await self.db.event("instance.offer_rejected", {"offer_id": offer_id, "reason": "provider_unavailable"})
+                    raise OfferUnavailableError("Vast rejected the unavailable offer") from create_error
                 await self.db.set("instance.phase", InstancePhase.ERROR.value)
                 await self.db.event(
                     "instance.rent_failed",

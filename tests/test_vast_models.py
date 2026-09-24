@@ -15,6 +15,7 @@ def test_offer_query_uses_gb_threshold_and_policy():
     assert "dph_total<=0.5000" in query
     assert "disk_space>=60" in query
     assert "verified=true" in query
+    assert "rented=false" in query
     assert "inet_down>=100" in query
 
 

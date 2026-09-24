@@ -21,6 +21,7 @@ def build_offer_query(
     terms = [
         "num_gpus=1",
         "rentable=true",
+        "rented=false",
         f"gpu_ram>={int(min_gpu_ram_gb)}",
         f"reliability>={min_reliability:.4f}",
         f"dph_total<={max_price_usd_hour:.4f}",

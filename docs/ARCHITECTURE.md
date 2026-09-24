@@ -101,9 +101,9 @@ Do not add an LLM to infer emotions or rewrite text.
 
 ## Vast marketplace behavior
 
-Every refresh performs a new Vast API request. VoxPilot asks Vast for a wider pool than the number displayed, normalizes results, then sorts deterministically.
+Every refresh performs a new Vast API request. VoxPilot asks Vast for a wider pool than the number displayed, normalizes results, sorts deterministically, and presents only rows that pass the same local policy used at rental time. Its policy explicitly excludes already rented offers.
 
-The selected offer is checked again against the configured maximum hourly price immediately before rental.
+The selected offer is checked by numeric ID together with the full policy and configured maximum hourly price immediately before rental. A definitive provider unavailable response releases a pending create only after a successful empty inventory check; ambiguous outcomes keep the duplicate-rental guard.
 
 A unique instance label is used for recovery if Vast's create response does not return a usable instance ID.
 

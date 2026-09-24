@@ -1,9 +1,12 @@
+from dataclasses import replace
+
 import pytest
 
 from voxpilot.config import Settings
 from voxpilot.db import Database
 from voxpilot.domain import GpuOffer
 from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator, OrchestratorError
+from voxpilot.services.vast_gateway import VastError, VastOfferUnavailableError
 
 
 def offer(
@@ -32,15 +35,18 @@ def offer(
 
 
 class FakeVast:
-    def __init__(self, selected: GpuOffer | None = None):
+    def __init__(self, selected: GpuOffer | None = None, rows: list[GpuOffer] | None = None):
         self.selected = selected or offer(1)
+        self.rows = rows if rows is not None else [offer(1), offer(2, 0.21)]
         self.search_calls = []
         self.find_calls = []
         self.created = False
+        self.create_error = None
+        self.reconcile_error = None
 
     async def search_offers(self, query, limit, storage_gb=5.0):
         self.search_calls.append((query, limit, storage_gb))
-        return [offer(1), offer(2, 0.21)]
+        return self.rows[:limit]
 
     async def find_offer(self, offer_id, *, policy_query, storage_gb):
         self.find_calls.append((offer_id, policy_query, storage_gb))
@@ -48,9 +54,13 @@ class FakeVast:
 
     async def create_instance(self, *args, **kwargs):
         self.created = True
+        if self.create_error:
+            raise self.create_error
         return {"new_contract": 123}
 
     async def find_instances_by_label(self, *args, **kwargs):
+        if self.reconcile_error:
+            raise self.reconcile_error
         return []
 
 
@@ -118,6 +128,21 @@ async def test_rent_rejects_offer_that_no_longer_matches_policy(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rent_rejects_price_increase_over_hard_ceiling(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    vast = FakeVast(selected=offer(1, price=0.51))
+    orch = Orchestrator(Settings(vast_api_key="x", vast_max_price_usd_hour=0.50), db, vast)
+
+    assert [item.offer_id for item in await orch.offers()] == [1, 2]
+    with pytest.raises(OfferUnavailableError):
+        await orch.rent(1)
+
+    assert vast.created is False
+    assert await db.get("instance.pending_label") is None
+
+
+@pytest.mark.asyncio
 async def test_unresolved_create_blocks_second_rental(tmp_path):
     db = Database(tmp_path / "db.sqlite3")
     await db.init()
@@ -129,3 +154,97 @@ async def test_unresolved_create_blocks_second_rental(tmp_path):
         await orch.rent(1)
 
     assert vast.created is False
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_display_offers_its_local_policy_would_reject(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    vast = FakeVast(rows=[offer(1, inet_down=20), offer(2, 0.21), offer(3, direct_ports=0)])
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+
+    displayed = await orch.offers()
+
+    assert [item.offer_id for item in displayed] == [2]
+    assert [item["offer_id"] for item in await db.get("offers.last")] == [2]
+    assert vast.search_calls[0][1] > orch.settings.vast_default_limit
+    assert "rented=false" in vast.search_calls[0][0]
+
+
+@pytest.mark.asyncio
+async def test_missing_optional_provider_fields_do_not_false_reject_policy_match(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    partial = offer(3)
+    partial.raw.pop("direct_port_count")
+    partial = replace(partial, inet_down_mbps=None)
+    vast = FakeVast(selected=partial, rows=[partial])
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+
+    assert [item.offer_id for item in await orch.offers()] == [3]
+    result = await orch.rent(3)
+    assert result["instance_id"] == 123
+
+
+@pytest.mark.asyncio
+async def test_failed_offer_is_excluded_from_immediate_refresh(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    orch = Orchestrator(Settings(vast_api_key="x"), db, FakeVast())
+
+    displayed = await orch.offers(exclude_offer_ids={1})
+
+    assert [item.offer_id for item in displayed] == [2]
+    assert [item["offer_id"] for item in await db.get("offers.last")] == [2]
+
+
+@pytest.mark.asyncio
+async def test_definitive_create_rejection_releases_pending_label(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    vast = FakeVast()
+    vast.create_error = VastOfferUnavailableError("no_such_ask")
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+    await orch.offers()
+
+    with pytest.raises(OfferUnavailableError):
+        await orch.rent(1)
+
+    assert await db.get("instance.phase") == "none"
+    assert await db.get("instance.pending_label") is None
+    assert await db.get("instance.id") is None
+    assert await db.get("fish.token") is None
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_create_result_keeps_duplicate_rental_guard(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    vast = FakeVast()
+    vast.create_error = VastError("timeout")
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+    await orch.offers()
+
+    with pytest.raises(OrchestratorError):
+        await orch.rent(1)
+
+    assert await db.get("instance.phase") == "error"
+    assert await db.get("instance.pending_label") is not None
+    with pytest.raises(OrchestratorError, match="unresolved"):
+        await orch.rent(1)
+
+
+@pytest.mark.asyncio
+async def test_provider_rejection_with_failed_inventory_stays_unresolved(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    await db.init()
+    vast = FakeVast()
+    vast.create_error = VastOfferUnavailableError("no_such_ask")
+    vast.reconcile_error = VastError("inventory unavailable")
+    orch = Orchestrator(Settings(vast_api_key="x"), db, vast)
+    await orch.offers()
+
+    with pytest.raises(OrchestratorError):
+        await orch.rent(1)
+
+    assert await db.get("instance.pending_label") is not None
