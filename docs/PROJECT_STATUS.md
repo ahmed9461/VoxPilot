@@ -8,7 +8,7 @@ Last updated: 2026-09-24
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
 
-Marketplace/rental repair for the owner's repeated offer rejection has passed the local gate (58 pytest tests, Python compileall, bootstrap shell syntax, diff whitespace). The exact controller-side rejection reason is not yet available. The change aligns policy searches, filters displayed offers locally, handles definitive `no_such_ask` responses, and avoids immediately re-offering a rejected ID. Commit, matching CI, deployment to New-VPS, and live owner acceptance remain. The currently deployed controller still runs the earlier `5229d1f` baseline.
+Marketplace/rental repair for the owner's repeated offer rejection is on `main` at `ad597212a850fea5c2ede864ad8263bf073ff458`. The local gate passed (58 pytest tests, Python compileall, bootstrap shell syntax, diff whitespace), and matching GitHub Actions run `36037444914` completed successfully. The exact controller-side rejection reason is not yet available. The change aligns policy searches, filters displayed offers locally, handles definitive `no_such_ask` responses, and avoids immediately re-offering a rejected ID. Deployment to New-VPS and live owner acceptance remain. The currently deployed controller still runs the earlier `5229d1f` baseline.
 
 New-VPS runs repair commit `5229d1f` and `voxpilot.service` is active with zero restarts after deployment. The owner deleted the GPU rental. Fresh provider inventory returned zero instances; the controller reports phase `none`, no tracked instance, no active meter, and a final billing snapshot. Do not create a replacement rental as part of this repair.
 
