@@ -91,9 +91,11 @@ def emotions_keyboard(active_key: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def tts_settings_keyboard() -> InlineKeyboardMarkup:
+def tts_settings_keyboard(stability_mode: bool = False) -> InlineKeyboardMarkup:
+    stability_label = "🧷 ثبات الأداء ✅" if stability_mode else "🧷 ثبات الأداء"
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text=stability_label, callback_data="settings:stability", style="primary")],
             [
                 InlineKeyboardButton(text="🌡 الحرارة", callback_data="settings:temperature"),
                 InlineKeyboardButton(text="🎯 Top‑P", callback_data="settings:top_p"),
