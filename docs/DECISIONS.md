@@ -186,3 +186,20 @@ Do not add an LLM, semantic scene parser, prompt enhancer, or fixed exhaustive t
 Numeric-only, empty, multiline, and malformed parentheses are kept literal to reduce accidental conversion.
 
 Reason: the owner wants expressive scripts without memorizing Fish tag syntax, while the project must remain light, deterministic, and faithful to its no-chat/no-hidden-prompt boundary.
+
+
+## 2026-09-28 — Prefer documented native tags for common Arabic effects
+
+Keep the open-domain parenthetical stage-direction syntax, but canonicalize a small set of exact common Arabic effect phrases to tags listed by the pinned Fish Speech README. Examples include `sigh`, `laughing`, `chuckle`, `inhale`, `exhale`, `panting`, `whisper`, `screaming`, `shouting`, `pause`, `short pause`, `clearing throat`, and `moaning`.
+
+Do not attempt fuzzy semantic matching. If the whole normalized direction does not match a curated alias, preserve it as a free-form S2 instruction.
+
+Reason: this improves consistency for common effects without turning VoxPilot into a prompt rewriter or incorrectly interpreting negations and complex acting directions.
+
+## 2026-09-28 — Add reversible consistency mode using existing Fish controls
+
+Add `tts.stability_mode`, enabled by default. When enabled, the request uses VoxPilot's consistency preset: temperature 0.6, top_p 0.7, and seed 42. The owner's stored normal-mode temperature/top_p/seed values are not overwritten and resume when the toggle is disabled.
+
+These values are a VoxPilot product preset, not claimed Fish defaults. No unsupported request field is introduced.
+
+Reason: the owner observed that the same performance instruction can be followed strongly on one generation and weakly on another. Lower sampling variability plus a fixed seed provides a practical repeatability option while preserving a one-tap path back to expressive/random generation.
