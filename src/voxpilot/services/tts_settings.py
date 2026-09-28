@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import re
 
 from voxpilot.db import Database
 from voxpilot.domain import TTSSettings
@@ -21,6 +22,29 @@ EMOTION_TAGS: dict[str, tuple[str, str]] = {
 }
 
 DEFAULTS = TTSSettings()
+
+# VoxPilot mirrors Fish S2's friendly web-style shorthand: natural-language
+# stage directions in ordinary parentheses are converted to native [] tags
+# before the request is sent. Fish itself interprets the instruction.
+_STAGE_DIRECTION_PATTERNS = (
+    re.compile(r"\(([^()\r\n]{1,200})\)"),
+    re.compile(r"（([^（）\r\n]{1,200})）"),
+)
+
+
+def normalize_stage_directions(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        direction = match.group(1).strip()
+        if not direction or not any(char.isalpha() for char in direction):
+            return match.group(0)
+        return f"[{direction}]"
+
+    normalized = text
+    for pattern in _STAGE_DIRECTION_PATTERNS:
+        normalized = pattern.sub(replace, normalized)
+    return normalized
+
+
 _KEYS = {
     "emotion_key": "tts.emotion_key",
     "format": "tts.format",
@@ -83,5 +107,6 @@ def compose_performance_text(text: str, emotion_key: str) -> str:
         raise ValueError("Text cannot be empty")
     if emotion_key not in EMOTION_TAGS:
         raise ValueError("Unsupported emotion")
+    prepared = normalize_stage_directions(clean)
     tag = EMOTION_TAGS[emotion_key][1]
-    return f"{tag} {clean}" if tag else clean
+    return f"{tag} {prepared}" if tag else prepared
