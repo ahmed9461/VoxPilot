@@ -1,6 +1,6 @@
 import pytest
 
-from voxpilot.services.tts_settings import EMOTION_TAGS, compose_performance_text
+from voxpilot.services.tts_settings import EMOTION_TAGS, compose_performance_text, normalize_stage_directions
 
 
 def test_normal_does_not_modify_text():
@@ -15,3 +15,31 @@ def test_emotion_prepends_native_tag_only():
 def test_unknown_emotion_is_rejected():
     with pytest.raises(ValueError):
         compose_performance_text("hello", "invented")
+
+
+def test_arabic_stage_direction_becomes_native_s2_tag():
+    assert normalize_stage_directions("(تتنهد بهدوء) اشتقت لك") == "[تتنهد بهدوء] اشتقت لك"
+
+
+def test_multiple_stage_directions_convert_independently():
+    text = "(تتردد قليلًا) مرحبًا... (تضحك بخفة) أخيرًا شفتك"
+    assert normalize_stage_directions(text) == "[تتردد قليلًا] مرحبًا... [تضحك بخفة] أخيرًا شفتك"
+
+
+def test_existing_manual_fish_tags_are_preserved():
+    assert normalize_stage_directions("[laughing] hello") == "[laughing] hello"
+
+
+def test_non_direction_parentheses_stay_literal():
+    assert normalize_stage_directions("الإصدار (2026) جاهز") == "الإصدار (2026) جاهز"
+    assert normalize_stage_directions("() نص") == "() نص"
+    assert normalize_stage_directions("(تتنهد\nبهدوء) نص") == "(تتنهد\nبهدوء) نص"
+    assert normalize_stage_directions("(تتنهد نص") == "(تتنهد نص"
+
+
+def test_global_emotion_and_stage_direction_work_together():
+    assert compose_performance_text("(بصوت متردد) أهلًا", "sad") == "[sad] [بصوت متردد] أهلًا"
+
+
+def test_full_width_parentheses_are_supported():
+    assert normalize_stage_directions("（تضحك بخفة） أهلًا") == "[تضحك بخفة] أهلًا"
