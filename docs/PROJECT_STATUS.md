@@ -30,7 +30,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
-- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`. Common Arabic effect phrases now prefer exact documented Fish-native tags, unknown compound directions remain free-form, and a reversible consistency mode is enabled by default using only existing Fish sampling controls. PR #1 remains draft; matching CI for this reliability follow-up is pending.
+- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`. Common Arabic effect phrases now prefer exact documented Fish-native tags, unknown compound directions remain free-form, and a reversible consistency mode is enabled by default using only existing Fish sampling controls. PR #1 remains draft. Reliability follow-up HEAD `9d38718e` passed matching GitHub Actions run `36482362279` with bootstrap shell syntax, Python compileall, and 78 pytest tests.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.
