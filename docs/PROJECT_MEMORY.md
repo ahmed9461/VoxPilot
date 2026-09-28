@@ -102,6 +102,8 @@ The active voice ID is stored in SQLite. Reference audio bytes are sent with eac
 
 A global emotion/performance selection may prepend one model-native Fish tag to the requested text. The owner can still write Fish tags inline manually for sub-word or phrase-level control.
 
+Owner-authored stage directions may also be written naturally in ordinary parentheses. VoxPilot deterministically converts a balanced single-line parenthetical direction containing letters, such as `(تتنهد بهدوء)`, to Fish-native `[تتنهد بهدوء]` before synthesis. This is syntax normalization only: VoxPilot does not infer missing emotions, rewrite prose, translate instructions, or call another language model. Numeric-only, empty, multiline, and malformed parentheses stay literal. Existing square-bracket Fish tags are preserved.
+
 Initial curated controls:
 - normal
 - excited
