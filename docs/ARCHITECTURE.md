@@ -103,7 +103,9 @@ becomes:
 [تتنهد بهدوء] اشتقت لك.
 ```
 
-The normalizer is syntax-only: it does not infer emotion from prose, translate the direction, or call another model. Fish S2 interprets the owner's free-form instruction. Parentheses containing no letters, empty/malformed parentheses, and multiline parenthetical text remain literal.
+The normalizer is syntax-only: it does not infer emotion from prose or call another model. A small exact-match alias table converts common Arabic effects to documented S2-native tags (for example `تتنهد` -> `sigh`, `تضحك بخفة` -> `chuckle`, and `تلهث` -> `panting`). Unmatched compound directions remain free-form and Fish S2 interprets them. Parentheses containing no letters, empty/malformed parentheses, and multiline parenthetical text remain literal.
+
+The controller also exposes a reversible consistency mode. It changes only existing Fish sampling fields at request construction time (temperature 0.6, top_p 0.7, seed 42) and leaves the owner's stored normal-mode controls untouched.
 
 Do not add an LLM to infer emotions or rewrite text.
 
