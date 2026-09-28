@@ -175,3 +175,14 @@ Search and click-time exact-ID lookup must use the same policy, including `rente
 A definitive Vast `no_such_ask` response may release the pending create label only after inventory successfully finds no matching instance. An ambiguous create outcome or failed reconciliation retains the label and blocks another rental.
 
 Reason: the 2026-09-24 bot screenshot shows an offer rejected and the same offer cards displayed again. Review of pinned Vast SDK 1.6.0 also found that string and dictionary searches have different implicit `rented` defaults. The precise live rejection reason remains unconfirmed until the repaired controller records it.
+
+
+## 2026-09-28 — Natural parenthetical stage directions are syntax sugar only
+
+Allow the owner to write explicit performance directions in ordinary parentheses, for example `(تتنهد بهدوء)` or `(تضحك بخفة)`. Before synthesis, VoxPilot converts eligible single-line textual parenthetical directions to Fish S2's native square-bracket form. Existing `[tag]` input remains untouched.
+
+Do not add an LLM, semantic scene parser, prompt enhancer, or fixed exhaustive tag catalog. Fish S2 already accepts open-domain natural-language inline instructions, including non-English descriptions, so VoxPilot only normalizes syntax and leaves interpretation to Fish.
+
+Numeric-only, empty, multiline, and malformed parentheses are kept literal to reduce accidental conversion.
+
+Reason: the owner wants expressive scripts without memorizing Fish tag syntax, while the project must remain light, deterministic, and faithful to its no-chat/no-hidden-prompt boundary.
