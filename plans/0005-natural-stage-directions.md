@@ -61,4 +61,4 @@ GitHub Actions run `36478339131` passed on branch HEAD `1bd0ca5`: bootstrap shel
 
 ## 2026-09-28 reliability follow-up
 
-Owner use showed that free-form performance instructions can vary between generations. The follow-up therefore prefers exact documented S2 tags for common Arabic effect phrases and adds a reversible consistency mode. This does not claim that S2 will obey every performance instruction deterministically; voice/reference characteristics and model generation can still affect the result. Validation of this follow-up is pending on the new branch HEAD.
+Owner use showed that free-form performance instructions can vary between generations. The follow-up therefore prefers exact documented S2 tags for common Arabic effect phrases and adds a reversible consistency mode. This does not claim that S2 will obey every performance instruction deterministically; voice/reference characteristics and model generation can still affect the result. Reliability follow-up HEAD `9d38718e` passed matching GitHub Actions run `36482362279`: bootstrap shell syntax, Python compileall, and **78 pytest tests** succeeded.
