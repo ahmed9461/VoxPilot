@@ -286,3 +286,12 @@ The owner requested access to S2's broad expressive controls without memorizing 
 Implementation on `feature/natural-stage-directions` adds deterministic controller-side syntax normalization: textual single-line directions in ordinary parentheses become Fish-native square-bracket instructions immediately before synthesis. Existing manual `[tag]` input remains unchanged. The feature does not infer emotion from prose and adds no LLM or prompt-enhancement layer.
 
 Telegram generation/help text now demonstrates Arabic stage directions. Focused tests cover Arabic directions, multiple directions, manual Fish tags, numeric/empty/multiline/malformed parentheses, full-width parentheses, and coexistence with the global emotion preset. GitHub Actions run `36478339131` passed the implementation HEAD: bootstrap shell syntax, Python compileall, and the full pytest suite all succeeded. PR #1 is open as a draft. A final documentation-only synchronization commit follows and must receive matching CI before merge.
+
+
+## 2026-09-28 — Stage-direction reliability hardening
+
+Owner testing showed that S2 can follow the same free-form direction with different strength between generations. Review of the pinned Fish Speech README confirmed native tags including `pause`, `laughing`, `inhale`, `chuckle`, `sigh`, `whisper`, `screaming`, `shouting`, `short pause`, `exhale`, `panting`, `clearing throat`, and `moaning`.
+
+The branch now canonicalizes exact common Arabic effect phrases to those documented native tags while leaving unmatched compound descriptions free-form. Matching is normalized for whitespace and Arabic diacritics but remains exact after normalization to avoid unsafe fuzzy interpretation.
+
+A persisted `stability_mode` toggle is also added. It defaults on and temporarily sends temperature 0.6, top_p 0.7, and seed 42; disabling it restores the owner's stored manual sampling values. No new Fish API field or LLM layer is introduced. Focused tests cover alias mapping, diacritics, free-form fallback, and stable/normal payload controls. Matching CI is pending on the new HEAD.
