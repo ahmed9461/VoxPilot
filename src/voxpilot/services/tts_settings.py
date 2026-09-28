@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import re
+import unicodedata
 
 from voxpilot.db import Database
 from voxpilot.domain import TTSSettings
@@ -21,15 +22,79 @@ EMOTION_TAGS: dict[str, tuple[str, str]] = {
     "singing": ("غناء", "[singing]"),
 }
 
+# VoxPilot consistency preset. These values use only Fish-native request
+# controls and are a product choice, not Fish defaults.
+STABILITY_TEMPERATURE = 0.6
+STABILITY_TOP_P = 0.7
+STABILITY_SEED = 42
+
 DEFAULTS = TTSSettings()
 
-# VoxPilot mirrors Fish S2's friendly web-style shorthand: natural-language
-# stage directions in ordinary parentheses are converted to native [] tags
-# before the request is sent. Fish itself interprets the instruction.
 _STAGE_DIRECTION_PATTERNS = (
     re.compile(r"\(([^()\r\n]{1,200})\)"),
     re.compile(r"（([^（）\r\n]{1,200})）"),
 )
+
+
+def _direction_key(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value)
+    without_marks = "".join(char for char in decomposed if unicodedata.category(char) != "Mn")
+    normalized = without_marks.replace("ـ", "").replace("ى", "ي").casefold()
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized.strip(" .،,!؟?؛;:…")
+
+
+_NATIVE_DIRECTION_ALIASES: dict[str, str] = {
+    _direction_key(alias): tag
+    for alias, tag in {
+        "تتنهد": "sigh",
+        "تنهد": "sigh",
+        "تنهيدة": "sigh",
+        "تتنهد بهدوء": "sigh",
+        "تنهد بهدوء": "sigh",
+        "تضحك": "laughing",
+        "يضحك": "laughing",
+        "ضحك": "laughing",
+        "تضحك بخفة": "chuckle",
+        "يضحك بخفة": "chuckle",
+        "ضحكة خفيفة": "chuckle",
+        "تأخذ نفسًا": "inhale",
+        "يأخذ نفسًا": "inhale",
+        "شهيق": "inhale",
+        "تستنشق": "inhale",
+        "تزفر": "exhale",
+        "يزفر": "exhale",
+        "زفير": "exhale",
+        "تلهث": "panting",
+        "يلهث": "panting",
+        "لهث": "panting",
+        "تهمس": "whisper",
+        "يهمس": "whisper",
+        "همس": "whisper",
+        "بصوت هامس": "whisper",
+        "تصرخ": "screaming",
+        "يصرخ": "screaming",
+        "صراخ": "screaming",
+        "ترفع صوتها": "shouting",
+        "يرفع صوته": "shouting",
+        "بصوت مرتفع": "shouting",
+        "تتوقف": "pause",
+        "يتوقف": "pause",
+        "توقف": "pause",
+        "تتوقف قليلًا": "short pause",
+        "يتوقف قليلًا": "short pause",
+        "توقف قصير": "short pause",
+        "صمت قصير": "short pause",
+        "تتنحنح": "clearing throat",
+        "يتنحنح": "clearing throat",
+        "تنحنح": "clearing throat",
+        "تنظف حلقها": "clearing throat",
+        "ينظف حلقه": "clearing throat",
+        "تتأوه": "moaning",
+        "يتأوه": "moaning",
+        "تأوه": "moaning",
+    }.items()
+}
 
 
 def normalize_stage_directions(text: str) -> str:
@@ -37,12 +102,19 @@ def normalize_stage_directions(text: str) -> str:
         direction = match.group(1).strip()
         if not direction or not any(char.isalpha() for char in direction):
             return match.group(0)
-        return f"[{direction}]"
+        native_tag = _NATIVE_DIRECTION_ALIASES.get(_direction_key(direction))
+        return f"[{native_tag or direction}]"
 
     normalized = text
     for pattern in _STAGE_DIRECTION_PATTERNS:
         normalized = pattern.sub(replace, normalized)
     return normalized
+
+
+def effective_sampling_controls(settings: TTSSettings) -> tuple[float, float, int | None]:
+    if settings.stability_mode:
+        return STABILITY_TEMPERATURE, STABILITY_TOP_P, STABILITY_SEED
+    return settings.temperature, settings.top_p, settings.seed
 
 
 _KEYS = {
@@ -55,6 +127,7 @@ _KEYS = {
     "max_new_tokens": "tts.max_new_tokens",
     "normalize": "tts.normalize",
     "seed": "tts.seed",
+    "stability_mode": "tts.stability_mode",
 }
 
 
@@ -99,6 +172,8 @@ def _validate(settings: TTSSettings) -> None:
         raise ValueError("chunk_length must be between 100 and 1000")
     if settings.max_new_tokens < 1:
         raise ValueError("max_new_tokens must be positive")
+    if not isinstance(settings.stability_mode, bool):
+        raise ValueError("stability_mode must be boolean")
 
 
 def compose_performance_text(text: str, emotion_key: str) -> str:
