@@ -1,12 +1,14 @@
 # VoxPilot — Project Status
 
-Last updated: 2026-09-24
+Last updated: 2026-09-28
 
 ## Current phase
 
 **Phase 2 — Live Vast/Fish acceptance and hardening**
 
-Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
+Active implementation plan: `plans/0005-natural-stage-directions.md`.
+
+The live Vast/Fish acceptance track in `plans/0004-live-bootstrap-and-acceptance.md` remains open; plan 0005 is a scoped owner-requested UX improvement and does not create or modify a Vast rental.
 
 Marketplace/rental repair for the owner's repeated offer rejection is on `main` at `ad597212a850fea5c2ede864ad8263bf073ff458`. The local gate passed (58 pytest tests, Python compileall, bootstrap shell syntax, diff whitespace), and matching GitHub Actions run `36037444914` completed successfully. The exact controller-side rejection reason is not yet available. The change aligns policy searches, filters displayed offers locally, handles definitive `no_such_ask` responses, and avoids immediately re-offering a rejected ID. Deployment to New-VPS and live owner acceptance remain. The currently deployed controller still runs the earlier `5229d1f` baseline.
 
@@ -28,6 +30,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
+- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`. Common Arabic effect phrases now prefer exact documented Fish-native tags, unknown compound directions remain free-form, and a reversible consistency mode is enabled by default using only existing Fish sampling controls. PR #1 remains draft. Reliability follow-up HEAD `9d38718e` passed matching GitHub Actions run `36482362279` with bootstrap shell syntax, Python compileall, and 78 pytest tests.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.

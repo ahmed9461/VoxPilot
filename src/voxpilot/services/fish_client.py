@@ -6,6 +6,7 @@ import httpx
 import msgpack
 
 from voxpilot.domain import TTSSettings
+from voxpilot.services.tts_settings import effective_sampling_controls
 
 
 class FishClientError(RuntimeError):
@@ -24,6 +25,7 @@ def build_tts_payload(
         if not reference_audio or not reference_text or not reference_text.strip():
             raise ValueError("Reference audio and matching reference text must be provided together")
         references.append({"audio": reference_audio, "text": reference_text.strip()})
+    temperature, top_p, seed = effective_sampling_controls(settings)
     return {
         "text": text,
         "references": references,
@@ -32,12 +34,12 @@ def build_tts_payload(
         "latency": "normal",
         "max_new_tokens": settings.max_new_tokens,
         "chunk_length": settings.chunk_length,
-        "top_p": settings.top_p,
+        "top_p": top_p,
         "repetition_penalty": settings.repetition_penalty,
-        "temperature": settings.temperature,
+        "temperature": temperature,
         "streaming": False,
         "use_memory_cache": "off",
-        "seed": settings.seed,
+        "seed": seed,
         "normalize": settings.normalize,
     }
 

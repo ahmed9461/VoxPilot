@@ -43,7 +43,7 @@ The controller is the durable part of VoxPilot. It runs independently of the ren
 - operational events and state in SQLite.
 - authenticated requests to the Fish API.
 
-The controller does not host a language model and does not rewrite user text.
+The controller does not host a language model and does not semantically rewrite user text. It may perform deterministic syntax normalization for explicit owner-authored stage directions, such as converting `(تتنهد بهدوء)` into Fish-native `[تتنهد بهدوء]`.
 
 ## Temporary Vast instance
 
@@ -89,13 +89,23 @@ Reference audio is not copied permanently to the Vast instance. It travels with 
 
 ## Emotion / prosody controls
 
-The bot exposes curated native S2 tags for convenient global selection. This does not prevent manual inline tags inside the user's text.
+The bot exposes curated native S2 tags for convenient global selection. Manual inline tags remain valid.
 
-Example:
+For easier script writing, ordinary parenthesized stage directions are normalized locally into Fish's square-bracket syntax:
 
 ```text
-[excited] النص المطلوب...
+(تتنهد بهدوء) اشتقت لك.
 ```
+
+becomes:
+
+```text
+[تتنهد بهدوء] اشتقت لك.
+```
+
+The normalizer is syntax-only: it does not infer emotion from prose or call another model. A small exact-match alias table converts common Arabic effects to documented S2-native tags (for example `تتنهد` -> `sigh`, `تضحك بخفة` -> `chuckle`, and `تلهث` -> `panting`). Unmatched compound directions remain free-form and Fish S2 interprets them. Parentheses containing no letters, empty/malformed parentheses, and multiline parenthetical text remain literal.
+
+The controller also exposes a reversible consistency mode. It changes only existing Fish sampling fields at request construction time (temperature 0.6, top_p 0.7, seed 42) and leaves the owner's stored normal-mode controls untouched.
 
 Do not add an LLM to infer emotions or rewrite text.
 

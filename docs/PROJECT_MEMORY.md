@@ -102,6 +102,8 @@ The active voice ID is stored in SQLite. Reference audio bytes are sent with eac
 
 A global emotion/performance selection may prepend one model-native Fish tag to the requested text. The owner can still write Fish tags inline manually for sub-word or phrase-level control.
 
+Owner-authored stage directions may also be written naturally in ordinary parentheses. Common exact Arabic phrases are canonicalized to documented native S2 tags — for example `(تتنهد بهدوء)` -> `[sigh]`, `(تضحك بخفة)` -> `[chuckle]`, `(تلهث)` -> `[panting]`, and `(تهمس)` -> `[whisper]`. Unknown compound descriptions remain free-form inside `[ ]`; VoxPilot does not infer missing emotions, rewrite prose, translate arbitrary instructions, or call another language model. Numeric-only, empty, multiline, and malformed parentheses stay literal. Existing square-bracket Fish tags are preserved.
+
 Initial curated controls:
 - normal
 - excited
@@ -124,6 +126,8 @@ Initial sampling defaults follow Fish's official API client:
 - normalize: true
 - seed: random
 - output format: mp3
+
+VoxPilot consistency mode is enabled by default. It does not add new Fish fields; it temporarily resolves requests to temperature `0.6`, top_p `0.7`, and seed `42`. The owner's normal-mode temperature/top_p/seed remain stored and become active again when consistency mode is disabled.
 
 ## Vast baseline
 
