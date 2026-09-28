@@ -55,7 +55,9 @@ async def emotions(callback: CallbackQuery) -> None:
     settings = await load_tts_settings(db())
     await safe_edit_text(
         callback.message,
-        "🎭 <b>المشاعر والنبرة</b>\n\nاختر أداءً عامًا. ويمكنك أيضًا كتابة وسوم Fish داخل النص يدويًا للتحكم بأجزاء محددة.",
+        "🎭 <b>المشاعر والنبرة</b>\n\n"
+        "اختر أداءً عامًا. وللتحكم داخل النص اكتب وصف الأداء بين أقواس عادية، "
+        "مثل (تتنهد بهدوء) أو (تضحك بخفة). وسوم Fish اليدوية [ ] تبقى مدعومة.",
         reply_markup=emotions_keyboard(settings.emotion_key),
     )
 
