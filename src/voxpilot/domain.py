@@ -34,7 +34,7 @@ class GpuOffer:
     @property
     def display_name(self) -> str:
         rel = "?" if self.reliability is None else f"{self.reliability * 100:.1f}%"
-        return f"{self.gpu_name} • {self.gpu_ram_gb:.0f}GB • ${self.price_per_hour:.3f}/h • R {rel}"
+        return f"{self.gpu_name} • {self.gpu_ram_gb:.0f}GB • $" + f"{self.price_per_hour:.3f}/h • R {rel}"
 
     def public_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -65,6 +65,7 @@ class TTSSettings:
     max_new_tokens: int = 1024
     normalize: bool = True
     seed: int | None = None
+    stability_mode: bool = True
 
 
 @dataclass(slots=True, frozen=True)
