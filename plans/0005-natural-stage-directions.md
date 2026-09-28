@@ -48,3 +48,7 @@ Fish S2 remains responsible for interpreting the free-form instruction.
 - Existing `[laughing]` text is untouched.
 - `(2026)`, empty parentheses, unbalanced parentheses, and multiline parenthetical text remain literal.
 - Selecting a global preset still prepends its Fish tag after stage-direction normalization.
+
+## Validation result
+
+GitHub Actions run `36478339131` passed on branch HEAD `1bd0ca5`: bootstrap shell syntax, Python compileall, and the full pytest suite all succeeded. Final documentation synchronization is committed afterward and requires its own matching CI before merge.

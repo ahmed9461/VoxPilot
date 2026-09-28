@@ -30,7 +30,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
-- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`; eligible `(instruction)` text is normalized to Fish-native `[instruction]` without adding an LLM.
+- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`; eligible `(instruction)` text is normalized to Fish-native `[instruction]` without adding an LLM. GitHub Actions run `36478339131` passed the implementation HEAD; PR #1 remains draft while final documentation synchronization receives matching CI.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.
