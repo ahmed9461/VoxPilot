@@ -277,3 +277,12 @@ The repair explicitly excludes rented offers in the policy, combines the policy 
 Local gate: **58 pytest tests passed**, Python compileall, bootstrap `bash -n`, and diff whitespace check. No Vast rental was attempted during this repair. Commit, matching CI, New-VPS deployment, and a real rental from the bot remain to verify.
 
 Follow-up: repair commit `ad597212a850fea5c2ede864ad8263bf073ff458` is on `main`. Matching GitHub Actions run `36037444914` completed successfully. This work environment has no controller checkout or configured SSH target, so New-VPS has not been updated. The deployed bot remains on the earlier baseline until its checkout is fast-forwarded and `voxpilot.service` restarted; no new GPU was rented for validation.
+
+
+## 2026-09-28 — Natural stage-direction UX
+
+The owner requested access to S2's broad expressive controls without memorizing square-bracket Fish syntax. A scoped plan was added at `plans/0005-natural-stage-directions.md`.
+
+Implementation on `feature/natural-stage-directions` adds deterministic controller-side syntax normalization: textual single-line directions in ordinary parentheses become Fish-native square-bracket instructions immediately before synthesis. Existing manual `[tag]` input remains unchanged. The feature does not infer emotion from prose and adds no LLM or prompt-enhancement layer.
+
+Telegram generation/help text now demonstrates Arabic stage directions. Focused tests cover Arabic directions, multiple directions, manual Fish tags, numeric/empty/multiline/malformed parentheses, full-width parentheses, and coexistence with the global emotion preset. CI validation is pending on the branch at this checkpoint.
