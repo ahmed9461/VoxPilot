@@ -169,11 +169,13 @@ No custom inference gateway is required because the official Fish server already
 
 ## Operational recovery details
 
+Current operational next steps are the [remaining owner live acceptance in plan 0004](../plans/0004-live-bootstrap-and-acceptance.md#remaining-owner-live-acceptance); controller deployment is complete as recorded in the 2026-10-20 integration checkpoint below. September case observations and validation checkpoints in this memory do not establish current inventory, billing, or a pending controller update. Durable lifecycle and data-protection rules remain applicable.
+
 - A rental always performs a fresh Vast marketplace query immediately before create. The selected offer must still exist in the fresh result set and remain under the configured hard price ceiling.
 - Vast create uses a unique `VoxPilot-<random>` label. If the create response does not expose an instance ID, the controller attempts to reconcile exactly one instance with that label.
 - If the controller restarts while only a pending label is known, recovery searches by that label. When a paid instance is recovered and no billing meter exists yet, the meter is initialized from the cached contracted offer price before readiness probing continues.
 - Provisioning failure changes the lifecycle to ERROR but does not silently destroy the instance unless `VAST_AUTO_DESTROY_ON_PROVISION_FAILURE=true`.
-- The current code baseline passed GitHub Actions on 2026-09-22: bootstrap shell syntax, Python compileall and 14 pytest tests.
+- Historical validation checkpoint — 2026-09-22: the earlier code baseline passed GitHub Actions with bootstrap shell syntax, Python compileall and 14 pytest tests.
 
 
 ## Vast selected-offer revalidation
@@ -205,9 +207,11 @@ The old text-only exact-ID revalidation rule is superseded by this layered looku
 
 Vast SDK 1.6.0's string search and pre-parsed dictionary search use different default `rented` filters. VoxPilot now explicitly requests `rented=false` in its policy, combines that policy with the numeric offer ID in the exact lookup, and keeps a wide policy-search fallback. The displayed list is locally checked against the same policy as click-time rental, with a wider fetched pool to replace filtered rows. Absent optional response fields (such as direct port count and download speed) are not treated as contrary evidence when the provider query itself enforces the requirement. Known contradictory values and the hard hourly price cap still reject an offer.
 
-When a selected offer is rejected, the bot omits that ID from the immediate replacement list and records a safe rejection reason. Vast's explicit `no_such_ask` rejection is definitive: after a successful empty inventory reconciliation, clear the pending label and let the owner choose another offer. Preserve the pending label on timeouts, malformed/sparse responses, or failed inventory reconciliation so a possible paid instance cannot be duplicated. These changes passed local tests but have not been exercised against the live controller or a new Vast rental.
+When a selected offer is rejected, the bot omits that ID from the immediate replacement list and records a safe rejection reason. Vast's explicit `no_such_ask` rejection is definitive: after a successful empty inventory reconciliation, clear the pending label and let the owner choose another offer. Preserve the pending label on timeouts, malformed/sparse responses, or failed inventory reconciliation so a possible paid instance cannot be duplicated. At the 2026-09-24 checkpoint, only local tests were recorded. Controller deployment is now complete as recorded below; live marketplace/rental acceptance remains separate work.
 
-## Live Fish CUDA and Vast stop lessons
+## Historical Fish CUDA and Vast stop case — 2026-09-22 to 2026-09-23
+
+Resource observations and requests about preserving the original rental in this case describe September only. They are not evidence of a current paid or running instance, or instructions to repeat deployment. The implementation safeguards described alongside them remain relevant.
 
 The first successful rental used an RTX 3090 with NVIDIA driver 535.161.07. Bootstrap downloaded the pinned Fish source, environment, and S2 Pro weights, but Fish startup stalled with CUDA error 804. Loader tracing showed that the CUDA image selected `/usr/local/cuda-12.6/compat/libcuda.so.1` instead of the mounted host driver at `/usr/lib/x86_64-linux-gnu/libcuda.so.1`. On the same rental, loading the host library made PyTorch GPU allocation and Fish model startup work. Bootstrap now selects that host library when present and runs a real CUDA allocation check before downloading model weights. It remains safe to leave the image's normal library choice in place if the mounted host library is absent; the preflight then fails explicitly if CUDA is unusable.
 
@@ -229,7 +233,7 @@ Vast's lifecycle methods can return a JSON `success=false` even when the HTTP re
 
 After the repaired warm start and deployment, the original rental reached Fish health and produced Arabic MP3 output again without rebuilding its S2 Pro cache. A synthetic-reference `[whisper]` request succeeded. The Fish log did not contain the synthetic prompt marker after generation, while its port and GPU compute process remained active. User voice quality and Telegram delivery still require owner-side acceptance. Do not use a live destroy merely to prove the code path while this working paid rental is being preserved; it has automated inventory-confirmation coverage.
 
-## Owner TTS failure and reference boundary — 2026-09-23
+## Historical owner TTS failure and reference boundary — 2026-09-23
 
 Fish health only proves that the API process responds; it does not prove that a reference-based synthesis fits GPU memory. The owner's Telegram requests failed with HTTP 500 and CUDA out of memory on a 24 GB GPU while the active saved OGG reference lasted about 89.8 seconds. A second saved reference lasts about 47.7 seconds. Both remain preserved on the controller. Fish's documented typical voice-cloning samples are 10–30 seconds; VoxPilot now uses a 30-second decoded-audio maximum for new uploads and revalidates stored references before each synthesis. An existing overlong sample must never silently fall back to another voice. The owner can select the default voice from the voices menu or upload a short sample with its matching transcript. A short sample reduces the observed memory risk but is not a guarantee against every Fish or GPU failure. The controller needs `ffprobe`.
 

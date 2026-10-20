@@ -56,7 +56,9 @@ When changing the pinned Fish source or bootstrap privacy patch, check that the 
 
 ## Live acceptance
 
-After automated tests pass:
+For the existing controller, deployment is complete. Current acceptance work is limited to the [remaining owner live acceptance in plan 0004](../plans/0004-live-bootstrap-and-acceptance.md#remaining-owner-live-acceptance).
+
+The following is a generic end-to-end checklist for a separately authorized live acceptance session, not the current task list. Passing automated tests does not authorize reconfiguring the existing controller or repeating deployment. Rental, lifecycle, and cleanup steps require fresh resource evidence and explicit owner authorization; they must not be inferred from September observations.
 
 1. Configure controller secrets.
 2. Search Vast and verify results are fresh and respect policy.
