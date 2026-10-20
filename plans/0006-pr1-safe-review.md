@@ -29,3 +29,5 @@ Before merge, main remains unchanged. After merge, revert the merge commit with 
 ## Local review result
 
 Parser protected-region and legacy settings migration repairs are implemented with regression tests. Full Python 3.12.10 gate passed: 90 tests, compileall, bootstrap syntax, and diff whitespace. Pinned Fish README/schema were checked directly. No blocking code finding remains from the local review. Push/final-head CI and merge are the remaining integration gates; deployment remains paused.
+
+Repair SHA `427843c30484a0e7f1adbbdd8130cbf108d179d0` passed both matching CI runs (`39426261177` PR, `39426251484` push), with 90 tests confirmed in the PR job log. Main is unchanged, the simulated merge tree matches the tested tree, and the original checkout remains clean. Final documentation synchronization also requires matching CI; merge must use the expected final head SHA. Deployment is a separate pending owner decision.
