@@ -24,7 +24,10 @@ Deliver:
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`
 
-Only after Phase 1 CI is green:
+Controller integration/deployment is complete under plan 0007. Current work is only the [remaining owner live acceptance in plan 0004](plans/0004-live-bootstrap-and-acceptance.md#remaining-owner-live-acceptance).
+
+The original Phase 2 milestone list below is retained as planning history, not a current task list or authorization for another rental/deployment. It does not establish current resource state:
+
 - first real Vast rental
 - measure bootstrap/model-download time
 - verify 24 GB GPU classes
