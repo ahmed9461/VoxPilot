@@ -236,3 +236,9 @@ Fish health only proves that the API process responds; it does not prove that a 
 The earlier absence of one synthetic marker in the Fish log was insufficient proof of prompt privacy. The pinned Fish revision calls `conversation_gen.visualize(...)` and prints reference/target text to stdout even when Loguru INFO is disabled. Bootstrap now applies a patch removing that call after every reset of the pinned source; this patch was checked against the actual pinned checkout. The old rental log contained prompt material and the owner is deleting that ephemeral GPU instance. Future live acceptance must inspect logs with a synthetic marker after generation without exposing owner text.
 
 The owner chose to delete the GPU rental while this repair finishes. A fresh Vast inventory contained zero instances; the controller has no tracked rental or active meter and retains a final billing snapshot. Do not recreate a GPU during code, CI, or controller deployment. The controller's saved voices and SQLite must survive GPU deletion.
+
+## Reviewed integration — 2026-10-20
+
+PR #1 was reviewed, repaired, tested, merged with the expected head SHA, and deployed to the existing controller after explicit owner approval. Application merge `93efbea89d20f23b13d8aacac7952dc26b499ada` passed matching CI with 90 tests. Configuration, saved voices, active selection, sampling values, and secrets were preserved; no extra server was rented. Live audio acceptance remains separate work.
+
+Deployment acceptance includes offline checks/imports as the service user, actual polling readiness with a bounded wait, subsequent service stability, and comparisons of configuration/data with a consistent pre-update snapshot. Keep sensitive deployment paths, runtime values, identities, and detailed operational records outside the public repository. A documentation-only checkout synchronization does not require another service restart when executable sources are identical.

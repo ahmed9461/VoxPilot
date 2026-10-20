@@ -6,17 +6,17 @@ Last updated: 2026-10-20
 
 **Phase 2 — Live Vast/Fish acceptance and hardening**
 
-Active implementation plan: `plans/0006-pr1-safe-review.md` (review and safe integration of plan 0005).
+Completed integration plan: `plans/0007-authorized-controller-update.md`, following review plan 0006 and implementation plan 0005.
 
 PR #1 review is complete against main `818163bb1fc7dc6d96305a4a8b59d97fe7789e81`, which is an ancestor of the PR. Repaired code `427843c30484a0e7f1adbbdd8130cbf108d179d0` passed the local Python 3.12 gate (90 pytest tests, compileall, bootstrap shell syntax, and diff whitespace) and matching [PR CI](https://github.com/ahmed9461/VoxPilot/actions/runs/39426261177) / [push CI](https://github.com/ahmed9461/VoxPilot/actions/runs/39426251484). The PR job log independently confirms 90 passing tests. Both workflow trees contain only the test workflow, with no deployment step; no unresolved review threads or reviews were present at inspection. The simulated merge tree equals the tested tree. Integration uses the normal GitHub merge path with an expected head SHA and successful CI on the final documentation-synchronized head. Branch protection/rules were inspected without changing security settings.
 
-New-VPS deployment and all service restarts are paused pending the owner's clarification. Historical server observations below have not been rechecked in this review. The original local checkout stays clean at `4fc38067c1357a78728899825718e0a38ad220ac`; no controller data or voice configuration was accessed or modified.
+The owner explicitly approved draft removal, merge, and the existing-controller update. PR #1 is merged and its application code deployed at `93efbea89d20f23b13d8aacac7952dc26b499ada`. Matching [merge CI](https://github.com/ahmed9461/VoxPilot/actions/runs/39428688670) passed 90 tests. Controller deployment and verification are complete; configuration, saved voices, active selection, and sampling settings were preserved. Private deployment records retain backup and rollback details outside the public repository. The original local checkout remains clean and unchanged.
 
 The live Vast/Fish acceptance track in `plans/0004-live-bootstrap-and-acceptance.md` remains open; plan 0005 is a scoped owner-requested UX improvement and does not create or modify a Vast rental.
 
-Marketplace/rental repair for the owner's repeated offer rejection is on `main` at `ad597212a850fea5c2ede864ad8263bf073ff458`. The local gate passed (58 pytest tests, Python compileall, bootstrap shell syntax, diff whitespace), and matching GitHub Actions run `36037444914` completed successfully. The exact controller-side rejection reason is not yet available. The change aligns policy searches, filters displayed offers locally, handles definitive `no_such_ask` responses, and avoids immediately re-offering a rejected ID. Deployment to New-VPS and live owner acceptance remain. The currently deployed controller still runs the earlier `5229d1f` baseline.
+Marketplace/rental repair `ad597212a850fea5c2ede864ad8263bf073ff458` is included in the deployed application code. Its live marketplace/rental acceptance remains separate work; this update did not rent another server or GPU.
 
-New-VPS runs repair commit `5229d1f` and `voxpilot.service` is active with zero restarts after deployment. The owner deleted the GPU rental. Fresh provider inventory returned zero instances; the controller reports phase `none`, no tracked instance, no active meter, and a final billing snapshot. Do not create a replacement rental as part of this repair.
+The existing controller passed offline checks, service imports, actual polling readiness, stable operation, and configuration/data preservation checks. Historical deployment observations below are retained as history and superseded by this checkpoint.
 
 The Phase 1 controller/runtime foundation is implemented on `main`. Phase 2 continues with live hardening and final acceptance.
 
@@ -34,7 +34,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
-- Natural parenthetical stage directions are implemented on PR #1. Common Arabic effect phrases prefer documented Fish-native tags, unknown compound directions remain free-form, and manual tags/nested parentheses stay literal. Reversible consistency mode defaults on for fresh settings; upgrades retain effective legacy sampling until opt-in. The 90-test local and matching CI review gate supersedes the earlier 78-test reliability checkpoint. Controller deployment remains paused.
+- Natural parenthetical stage directions are merged and deployed from PR #1. Common Arabic effect phrases prefer documented Fish-native tags, unknown compound directions remain free-form, and manual tags/nested parentheses stay literal. Reversible consistency mode defaults on for fresh settings; upgrades retain effective legacy sampling until opt-in. The 90-test local and matching CI gate supersedes the earlier 78-test reliability checkpoint.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.
@@ -60,13 +60,17 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 
 ## Validation state
 
+Current application code passed 90 local Python 3.12 tests and final PR/push/merge CI. The existing controller passed offline compilation/settings/parser checks, dependency consistency, imports as the service user, service/polling readiness, stable operation, data integrity, and settings/voice/environment preservation checks. No test dependencies were added to the production environment.
+
+### Historical validation (superseded)
+
 Repair commit `5229d1f` passed 48 local pytest tests, Python compileall, bootstrap shell syntax, and diff whitespace checks. The Fish privacy patch applies cleanly to the exact pinned upstream commit. Matching GitHub Actions run `35794540192` succeeded. New-VPS was fast-forwarded after a consistent SQLite backup; service is active, repository clean, `.env` metadata unchanged, both saved voice profiles present, and no new service errors were counted after deployment. The live controller probes both profiles and confirms durations about 47.7 and 89.8 seconds, so the new guard will reject them until the owner chooses default voice or uploads a shorter reference.
 
 The previous deployed lifecycle baseline `e226bf0` passed GitHub Actions run `35787451378` with 40 tests.
 
 ## Current blockers
 
-The owner exercised Telegram generation. Fish health returned 200 while `/v1/tts` returned 500 with CUDA out of memory. Both saved references exceed 30 seconds. The original voice files remain stored on the controller. Duration validation, a default-voice escape path, clearer status/errors, and suppression of pinned Fish's unconditional prompt visualization are deployed. The GPU rental is gone; live post-fix synthesis and Fish log privacy must wait for a new owner-provisioned rental.
+No blocking controller review or deployment issue remains. Real speech quality, voice cloning, Telegram audio delivery, and GPU log privacy require separate owner acceptance; these were not claimed from offline checks. Historical long-reference findings below do not assert the quality or duration of every currently saved voice.
 
 ## Previous next action (superseded by plan 0004)
 
