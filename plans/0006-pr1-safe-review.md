@@ -4,7 +4,7 @@ Created: 2026-10-20
 
 ## Scope and constraints
 
-Review every changed file against current main `818163bb1fc7dc6d96305a4a8b59d97fe7789e81`. Preserve the owner's original clean checkout, saved voices, runtime data, and effective sampling settings. Work in an isolated local clone. Do not rent a Vast instance, deploy, restart a service, read private-key contents, or change security settings. Server deployment awaits explicit clarification.
+Review every changed file against main `818163bb1fc7dc6d96305a4a8b59d97fe7789e81`. Preserve the owner's original clean checkout, saved voices, runtime data, and effective sampling settings. Work in an isolated local clone. Do not rent a Vast instance, read private-key contents, or change security settings. Deployment and restarts were initially paused; the owner subsequently approved draft removal, merge, and a bounded existing-controller update under plan 0007.
 
 ## Work
 
@@ -17,7 +17,7 @@ Review every changed file against current main `818163bb1fc7dc6d96305a4a8b59d97f
 
 ## Rollback
 
-Before merge, main remains unchanged. After merge, revert the merge commit with a separate PR and normal checks; never force-push main. No controller rollback is needed while deployment is paused. A later authorized deployment must first back up SQLite and voice data and retain its previous code SHA; that action is outside this review.
+After merge, revert the merge commit with a separate PR and normal checks; never force-push main. Plan 0007 covers the authorized controller update and private consistent backup/rollback records. Never overwrite newer runtime data blindly during a code rollback.
 
 ## Initial evidence
 
@@ -28,6 +28,6 @@ Before merge, main remains unchanged. After merge, revert the merge commit with 
 
 ## Local review result
 
-Parser protected-region and legacy settings migration repairs are implemented with regression tests. Full Python 3.12.10 gate passed: 90 tests, compileall, bootstrap syntax, and diff whitespace. Pinned Fish README/schema were checked directly. No blocking code finding remains from the local review. Push/final-head CI and merge are the remaining integration gates; deployment remains paused.
+Parser protected-region and legacy settings migration repairs are implemented with regression tests. Full Python 3.12.10 gate passed: 90 tests, compileall, bootstrap syntax, and diff whitespace. Pinned Fish README/schema were checked directly. No blocking code finding remains from the local review.
 
-Repair SHA `427843c30484a0e7f1adbbdd8130cbf108d179d0` passed both matching CI runs (`39426261177` PR, `39426251484` push), with 90 tests confirmed in the PR job log. Main is unchanged, the simulated merge tree matches the tested tree, and the original checkout remains clean. Final documentation synchronization also requires matching CI; merge must use the expected final head SHA. Deployment is a separate pending owner decision.
+Repair SHA `427843c30484a0e7f1adbbdd8130cbf108d179d0` passed both matching CI runs (`39426261177` PR, `39426251484` push), with 90 tests confirmed in the PR job log. Final documentation head `bd1350764252eb4111fa7ac1d853f1244fec287e` passed PR/push runs `39426534069` / `39426526260`. Following explicit approval, draft removal succeeded and PR #1 merged with the expected head into `93efbea89d20f23b13d8aacac7952dc26b499ada`. Matching merge run `39428688670` passed. That application code is deployed and verified under plan 0007. The original local checkout remains clean.
