@@ -127,7 +127,9 @@ Initial sampling defaults follow Fish's official API client:
 - seed: random
 - output format: mp3
 
-VoxPilot consistency mode is enabled by default. It does not add new Fish fields; it temporarily resolves requests to temperature `0.6`, top_p `0.7`, and seed `42`. The owner's normal-mode temperature/top_p/seed remain stored and become active again when consistency mode is disabled.
+VoxPilot consistency mode is enabled by default for fresh installations. It does not add new Fish fields; it temporarily resolves requests to temperature `0.6`, top_p `0.7`, and seed `42`. The owner's normal-mode temperature/top_p/seed remain stored and become active again when consistency mode is disabled. On upgrade, existing TTS settings without an explicit stability toggle keep consistency mode off, preserving their effective sampling controls. Saved toggle values are retained. Neither initialization nor toggling changes the active voice or reference files.
+
+Stage-direction normalization preserves whole nested/malformed parenthetical groups and treats manual square-bracket tags as opaque. It never converts an inner parenthetical fragment of these protected regions. Eligible standalone directions remain limited to one line and 200 characters.
 
 ## Vast baseline
 

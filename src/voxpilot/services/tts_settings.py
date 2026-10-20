@@ -30,10 +30,7 @@ STABILITY_SEED = 42
 
 DEFAULTS = TTSSettings()
 
-_STAGE_DIRECTION_PATTERNS = (
-    re.compile(r"\(([^()\r\n]{1,200})\)"),
-    re.compile(r"（([^（）\r\n]{1,200})）"),
-)
+_PAREN_PAIRS = {"(": ")", "（": "）"}
 
 
 def _direction_key(value: str) -> str:
@@ -98,17 +95,43 @@ _NATIVE_DIRECTION_ALIASES: dict[str, str] = {
 
 
 def normalize_stage_directions(text: str) -> str:
-    def replace(match: re.Match[str]) -> str:
-        direction = match.group(1).strip()
-        if not direction or not any(char.isalpha() for char in direction):
-            return match.group(0)
-        native_tag = _NATIVE_DIRECTION_ALIASES.get(_direction_key(direction))
-        return f"[{native_tag or direction}]"
-
-    normalized = text
-    for pattern in _STAGE_DIRECTION_PATTERNS:
-        normalized = pattern.sub(replace, normalized)
-    return normalized
+    parts: list[str] = []
+    closers: list[str] = []
+    square_depth = 0
+    start = last = 0
+    nested_or_mismatched = False
+    for index, char in enumerate(text):
+        # Manual Fish tags are opaque, including any parentheses inside them.
+        if not closers and (square_depth or char == "["):
+            if char == "[":
+                square_depth += 1
+            elif char == "]":
+                square_depth -= 1
+            continue
+        if char in _PAREN_PAIRS:
+            if not closers:
+                start = index
+                nested_or_mismatched = False
+            else:
+                nested_or_mismatched = True
+            closers.append(_PAREN_PAIRS[char])
+        elif char in _PAREN_PAIRS.values() and closers:
+            if char != closers.pop():
+                nested_or_mismatched = True
+            if closers:
+                continue
+            raw = text[start + 1:index]
+            if (nested_or_mismatched or not 1 <= len(raw) <= 200
+                    or any(mark in raw for mark in "\r\n[]")):
+                continue
+            direction = raw.strip()
+            if not any(letter.isalpha() for letter in direction):
+                continue
+            native_tag = _NATIVE_DIRECTION_ALIASES.get(_direction_key(direction))
+            parts.extend((text[last:start], f"[{native_tag or direction}]"))
+            last = index + 1
+    parts.append(text[last:])
+    return "".join(parts)
 
 
 def effective_sampling_controls(settings: TTSSettings) -> tuple[float, float, int | None]:
@@ -131,9 +154,18 @@ _KEYS = {
 }
 
 
+def _defaults_for(current: dict) -> dict:
+    defaults = asdict(DEFAULTS)
+    # An existing installation must keep its effective sampling behavior until
+    # the owner explicitly enables the new consistency preset.
+    if current:
+        defaults["stability_mode"] = False
+    return defaults
+
+
 async def ensure_defaults(db: Database) -> None:
     current = await db.get_many(_KEYS.values())
-    defaults = asdict(DEFAULTS)
+    defaults = _defaults_for(current)
     missing = {_KEYS[field]: value for field, value in defaults.items() if _KEYS[field] not in current}
     if missing:
         await db.set_many(missing)
@@ -141,7 +173,7 @@ async def ensure_defaults(db: Database) -> None:
 
 async def load_tts_settings(db: Database) -> TTSSettings:
     rows = await db.get_many(_KEYS.values())
-    defaults = asdict(DEFAULTS)
+    defaults = _defaults_for(rows)
     values = {field: rows.get(key, defaults[field]) for field, key in _KEYS.items()}
     return TTSSettings(**values)
 

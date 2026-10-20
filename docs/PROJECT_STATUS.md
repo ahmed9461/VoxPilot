@@ -1,12 +1,16 @@
 # VoxPilot — Project Status
 
-Last updated: 2026-09-28
+Last updated: 2026-10-20
 
 ## Current phase
 
 **Phase 2 — Live Vast/Fish acceptance and hardening**
 
-Active implementation plan: `plans/0005-natural-stage-directions.md`.
+Active implementation plan: `plans/0006-pr1-safe-review.md` (review and safe integration of plan 0005).
+
+PR #1 has been reviewed in an isolated clone against current main `818163bb1fc7dc6d96305a4a8b59d97fe7789e81`, which is an ancestor of the PR. Parser boundary and legacy sampling migration fixes passed the local Python 3.12 gate: 90 pytest tests, compileall, bootstrap shell syntax, and diff whitespace. Fresh matching CI is required for the final pushed head before merge. Both workflow trees contain only the tests workflow, with no deployment step; no unresolved review threads or reviews were present at inspection.
+
+New-VPS deployment and all service restarts are paused pending the owner's clarification. Historical server observations below have not been rechecked in this review. The original local checkout stays clean at `4fc38067c1357a78728899825718e0a38ad220ac`; no controller data or voice configuration was accessed or modified.
 
 The live Vast/Fish acceptance track in `plans/0004-live-bootstrap-and-acceptance.md` remains open; plan 0005 is a scoped owner-requested UX improvement and does not create or modify a Vast rental.
 
@@ -30,7 +34,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
-- Natural parenthetical stage directions are implemented on `feature/natural-stage-directions`. Common Arabic effect phrases now prefer exact documented Fish-native tags, unknown compound directions remain free-form, and a reversible consistency mode is enabled by default using only existing Fish sampling controls. PR #1 remains draft. Reliability follow-up HEAD `9d38718e` passed matching GitHub Actions run `36482362279` with bootstrap shell syntax, Python compileall, and 78 pytest tests.
+- Natural parenthetical stage directions are implemented on PR #1. Common Arabic effect phrases prefer documented Fish-native tags, unknown compound directions remain free-form, and manual tags/nested parentheses stay literal. Reversible consistency mode defaults on for fresh settings; upgrades retain effective legacy sampling until opt-in. The current 90-test local review gate supersedes the earlier 78-test reliability checkpoint; final matching CI and normal PR merge remain required.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.

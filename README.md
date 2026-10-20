@@ -11,7 +11,7 @@ The project is intentionally focused: it converts text to speech, clones voices 
 - Generate speech from text through Fish S2 Pro.
 - Choose model-native performance presets such as excited, sad, angry, whisper, laughing, and singing.
 - Write natural stage directions in ordinary parentheses. Common Arabic effects such as `(تتنهد بهدوء)`, `(تضحك بخفة)`, `(تلهث)`, and `(تهمس)` are canonicalized to documented Fish-native tags; unmatched compound directions stay free-form.
-- Use the default-on consistency mode for lower sampling variability, or disable it to restore the saved normal sampling controls.
+- Use consistency mode for lower sampling variability. It defaults on for fresh installations; upgrades preserve existing sampling behavior until explicitly enabled. Disabling it restores the saved normal sampling controls.
 - Keep using native `[Fish tags]` manually whenever exact low-level placement is preferred.
 - Adjust real Fish request controls: temperature, top-p, repetition penalty, chunk length, max new tokens, normalization, seed, and output format.
 - Search Vast.ai live offers and show suitable 24GB+ GPUs.

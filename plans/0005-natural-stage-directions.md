@@ -16,7 +16,7 @@ Example owner input:
 Controller request text:
 
 ```text
-[تتردد قليلًا] ما كنت أعرف ماذا أقول... [تتنهد بهدوء] اشتقت لك.
+[تتردد قليلًا] ما كنت أعرف ماذا أقول... [sigh] اشتقت لك.
 ```
 
 Fish S2 remains responsible for interpreting the free-form instruction.
@@ -36,7 +36,7 @@ Fish S2 remains responsible for interpreting the free-form instruction.
 
 1. Add a small stage-direction normalizer in `tts_settings.py`.
 2. Canonicalize common Arabic effect phrases to documented Fish-native tags while preserving unknown descriptions as free-form instructions.
-3. Add an optional consistency preset using only existing Fish request controls (`temperature`, `top_p`, `seed`), enabled by default and reversible without overwriting saved manual values.
+3. Add an optional consistency preset using only existing Fish request controls (`temperature`, `top_p`, `seed`), enabled by default for fresh installations and reversible without overwriting saved manual values. Upgrades preserve effective legacy settings until opt-in (plan 0006).
 4. Run the normalizer before the existing global emotion preset is prepended.
 5. Update the generation/settings UI to explain canonical aliases and the consistency toggle.
 6. Add regression tests.

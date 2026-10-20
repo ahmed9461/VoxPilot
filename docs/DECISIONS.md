@@ -203,3 +203,11 @@ Add `tts.stability_mode`, enabled by default. When enabled, the request uses Vox
 These values are a VoxPilot product preset, not claimed Fish defaults. No unsupported request field is introduced.
 
 Reason: the owner observed that the same performance instruction can be followed strongly on one generation and weakly on another. Lower sampling variability plus a fixed seed provides a practical repeatability option while preserving a one-tap path back to expressive/random generation.
+
+## 2026-10-20 — Preserve syntax boundaries and effective legacy sampling
+
+Supersede the unconditional default-on upgrade rule above: enable consistency by default only when no TTS settings exist. An existing installation without `tts.stability_mode` keeps the preset off until the owner opts in. Explicit toggle values survive startup and restart. Preserve all stored controls, active voice selection, and voice files.
+
+Treat square-bracket tags as opaque. Preserve complete nested, mixed-width, multiline, and malformed parenthetical groups instead of converting inner fragments. Do not create nested Fish tags from parentheses containing square brackets.
+
+Reason: PR #1 review reproduced mutations inside manual Fish tags and nested parentheses; the old upgrade fallback silently replaced effective sampling values with the consistency preset. Both violate the intended compatibility boundary. A local SQLite migration/restart test now verifies preservation without accessing controller data.
