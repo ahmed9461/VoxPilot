@@ -1,12 +1,18 @@
 # VoxPilot — Project Status
 
-Last updated: 2026-09-24
+Last updated: 2026-10-20
 
 ## Current phase
 
 **Phase 2 — Live Vast/Fish acceptance and hardening**
 
-Active plan: `plans/0004-live-bootstrap-and-acceptance.md`.
+Active implementation plan: `plans/0006-pr1-safe-review.md` (review and safe integration of plan 0005).
+
+PR #1 review is complete against main `818163bb1fc7dc6d96305a4a8b59d97fe7789e81`, which is an ancestor of the PR. Repaired code `427843c30484a0e7f1adbbdd8130cbf108d179d0` passed the local Python 3.12 gate (90 pytest tests, compileall, bootstrap shell syntax, and diff whitespace) and matching [PR CI](https://github.com/ahmed9461/VoxPilot/actions/runs/39426261177) / [push CI](https://github.com/ahmed9461/VoxPilot/actions/runs/39426251484). The PR job log independently confirms 90 passing tests. Both workflow trees contain only the test workflow, with no deployment step; no unresolved review threads or reviews were present at inspection. The simulated merge tree equals the tested tree. Integration uses the normal GitHub merge path with an expected head SHA and successful CI on the final documentation-synchronized head. Branch protection/rules were inspected without changing security settings.
+
+New-VPS deployment and all service restarts are paused pending the owner's clarification. Historical server observations below have not been rechecked in this review. The original local checkout stays clean at `4fc38067c1357a78728899825718e0a38ad220ac`; no controller data or voice configuration was accessed or modified.
+
+The live Vast/Fish acceptance track in `plans/0004-live-bootstrap-and-acceptance.md` remains open; plan 0005 is a scoped owner-requested UX improvement and does not create or modify a Vast rental.
 
 Marketplace/rental repair for the owner's repeated offer rejection is on `main` at `ad597212a850fea5c2ede864ad8263bf073ff458`. The local gate passed (58 pytest tests, Python compileall, bootstrap shell syntax, diff whitespace), and matching GitHub Actions run `36037444914` completed successfully. The exact controller-side rejection reason is not yet available. The change aligns policy searches, filters displayed offers locally, handles definitive `no_such_ask` responses, and avoids immediately re-offering a rejected ID. Deployment to New-VPS and live owner acceptance remain. The currently deployed controller still runs the earlier `5229d1f` baseline.
 
@@ -28,6 +34,7 @@ Previous completed plan: `plans/0001-foundation-and-vast-fish-runtime.md`
 - Controller-side voice storage implemented.
 - Active voice selection and deletion implemented.
 - Fish-native emotion/performance presets implemented.
+- Natural parenthetical stage directions are implemented on PR #1. Common Arabic effect phrases prefer documented Fish-native tags, unknown compound directions remain free-form, and manual tags/nested parentheses stay literal. Reversible consistency mode defaults on for fresh settings; upgrades retain effective legacy sampling until opt-in. The 90-test local and matching CI review gate supersedes the earlier 78-test reliability checkpoint. Controller deployment remains paused.
 - Advanced Fish request controls implemented.
 - Official Fish MessagePack TTS client implemented.
 - Vast live search, normalized offers and deterministic ordering implemented.

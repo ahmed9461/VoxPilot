@@ -65,6 +65,7 @@ class TTSSettings:
     max_new_tokens: int = 1024
     normalize: bool = True
     seed: int | None = None
+    stability_mode: bool = True
 
 
 @dataclass(slots=True, frozen=True)

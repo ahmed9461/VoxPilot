@@ -42,7 +42,14 @@ def deps() -> tuple[Orchestrator, Database, VoiceStore]:
 async def generate_prompt(callback: CallbackQuery, state: FSMContext) -> None:
     await safe_callback_answer(callback)
     await state.set_state(GenerateState.text)
-    await safe_edit_text(callback.message, "📝 أرسل النص الذي تريد تحويله إلى صوت. يمكنك وضع وسوم Fish داخل النص يدويًا أيضًا.")
+    await safe_edit_text(
+        callback.message,
+        "📝 أرسل النص الذي تريد تحويله إلى صوت.\n\n"
+        "يمكنك كتابة تعليمات الأداء بالعربي بين أقواس عادية، مثل:\n"
+        "«(تتنهد بهدوء) اشتقت لك... (تضحك بخفة) أخيرًا شفتك.»\n\n"
+        "VoxPilot يحول التعليمات الشائعة إلى وسوم S2 الأصلية تلقائيًا، ويترك الأوصاف المركبة كتعليمات حرة. "
+        "وسوم Fish اليدوية بين [ ] تبقى مدعومة.",
+    )
 
 
 @router.message(GenerateState.text, F.text)
