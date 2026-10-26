@@ -1,7 +1,7 @@
 # Plan 0008 — Audit repairs and network-aware offers
 
 Created: 2026-10-27
-Status: ACTIVE
+Status: IMPLEMENTED — matching CI/integration tracked in the maintenance PR; not deployed
 Base: main at 54b08588a224d0b2baa9e58d87c6100cfd1deecd
 
 ## Owner authorization and exclusions
@@ -21,3 +21,9 @@ Implement the audit fixes, improve rental recovery and prioritize faster interne
 ## Validation
 
 Use isolated temporary databases, fake provider clients and synthetic audio only. Record actual test counts and failures. A successful automated suite does not establish real Vast inventory, download speeds, Fish audio quality or controller deployment.
+
+## Implementation checkpoint — 2026-10-27
+
+All scoped code repairs and network-aware selection are implemented with 149 local passing tests and Ruff/syntax/compilation checks. Documentation, exact dependency locks and a Python 3.11/3.12/3.13 test matrix are synchronized. See `docs/AUDIT_REPAIRS_2026-10-27.md` for upgrade and pending-recovery boundaries.
+
+Not claimed complete: HTTPS (owner deferral), clean dependency security scan (upstream incompatible pins), branch protection (missing administration permission), current controller deployment, live GPU/voice/market acceptance. Do not infer those from a successful regression suite. Cleanup is gated on fresh ancestry and exact expected heads; its result is recorded in the integration Actions log rather than assumed.

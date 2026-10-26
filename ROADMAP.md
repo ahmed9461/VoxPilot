@@ -24,7 +24,7 @@ Deliver:
 
 Active plan: `plans/0004-live-bootstrap-and-acceptance.md`
 
-Controller integration/deployment is complete under plan 0007. Current work is only the [remaining owner live acceptance in plan 0004](plans/0004-live-bootstrap-and-acceptance.md#remaining-owner-live-acceptance).
+The 2026-10-20 controller deployment is complete under plan 0007. Newer audit/network maintenance is tracked by plan 0008 and has not been deployed in this work. Current work includes integrating that tested change, addressing the documented upstream dependency pins, and the [remaining owner live acceptance in plan 0004](plans/0004-live-bootstrap-and-acceptance.md#remaining-owner-live-acceptance).
 
 The original Phase 2 milestone list below is retained as planning history, not a current task list or authorization for another rental/deployment. It does not establish current resource state:
 

@@ -31,6 +31,7 @@ async def main() -> None:
     db = Database(settings.database_path)
     await db.init()
     await ensure_defaults(db)
+    await db.set_many({"tts.active": False, "tts.operation": None})
     store = VoiceStore(settings.voice_data_dir)
     await store.init()
 
@@ -61,6 +62,7 @@ async def main() -> None:
         for task in (recovery_task, guard_task):
             task.cancel()
         await asyncio.gather(recovery_task, guard_task, return_exceptions=True)
+        await orchestrator.close()
         await bot.session.close()
 
 

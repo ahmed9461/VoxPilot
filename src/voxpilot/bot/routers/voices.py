@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from html import escape
 from io import BytesIO
+import secrets
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -78,6 +79,17 @@ async def voice_name(message: Message, state: FSMContext) -> None:
     await message.answer("🎤 أرسل الآن عينة الصوت كـ Voice أو ملف صوتي. الأفضل عينة نظيفة مدتها نحو 10–30 ثانية.")
 
 
+class _LimitedBuffer(BytesIO):
+    def __init__(self, limit: int):
+        super().__init__()
+        self.limit = limit
+
+    def write(self, data: bytes) -> int:
+        if self.tell() + len(data) > self.limit:
+            raise ValueError("Reference download exceeds limit")
+        return super().write(data)
+
+
 async def _accept_audio(
     message: Message,
     state: FSMContext,
@@ -88,26 +100,49 @@ async def _accept_audio(
     filename: str | None,
 ) -> None:
     _, store, settings = deps()
-    limit = settings.telegram_max_voice_mb * 1024 * 1024
+    limit_mb = min(settings.telegram_max_voice_mb, 20)
+    limit = limit_mb * 1024 * 1024
     if file_size and file_size > limit:
-        await message.answer(f"العينة أكبر من الحد المسموح ({settings.telegram_max_voice_mb} MB).")
+        await message.answer(f"العينة أكبر من الحد المسموح ({limit_mb} MB).")
         return
-    buffer = BytesIO()
-    await message.bot.download(file_id, destination=buffer)
-    data = buffer.getvalue()
+    upload_id = secrets.token_hex(8)
+    await state.update_data(upload_id=upload_id)
+
+    async def still_current() -> bool:
+        return (await state.get_state() == VoiceWizard.audio.state
+                and (await state.get_data()).get("upload_id") == upload_id)
+
+    try:
+        with _LimitedBuffer(limit) as buffer:
+            await message.bot.download(file_id, destination=buffer)
+            data = buffer.getvalue()
+    except Exception as exc:
+        logger.warning("Reference download failed: %s", type(exc).__name__)
+        if not await still_current():
+            return
+        await message.answer(f"تعذر تنزيل العينة. أعد إرسال ملف صوتي لا يتجاوز {limit_mb} MB.")
+        return
+    if not await still_current():
+        return
     if not data or len(data) > limit:
         await message.answer("تعذر قبول العينة أو حجمها أكبر من الحد.")
         return
     try:
         await store.validate_audio(data, mime_type, filename)
     except ReferenceAudioTooLong as exc:
+        if not await still_current():
+            return
         await message.answer(
             f"العينة مدتها نحو {exc.duration_seconds:.0f} ثانية. أرسل مقطعًا لا يتجاوز 30 ثانية، "
             "ثم اكتب النص المطابق لما قيل فيه."
         )
         return
     except ReferenceAudioError:
+        if not await still_current():
+            return
         await message.answer("تعذر قراءة مدة العينة أو تنسيقها. أرسل ملفًا صوتيًا صالحًا.")
+        return
+    if not await still_current():
         return
     await state.update_data(audio=data, mime_type=mime_type, filename=filename)
     await state.set_state(VoiceWizard.transcript)

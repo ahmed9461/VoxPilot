@@ -32,7 +32,8 @@ def offers_keyboard(offers: list[GpuOffer]) -> InlineKeyboardMarkup:
         for offer in offers
     ]
     rows += [
-        [InlineKeyboardButton(text="🔄 تحديث العروض", callback_data="servers:search", style="primary")],
+        [InlineKeyboardButton(text="🔄 تحديث العروض السريعة", callback_data="servers:search", style="primary")],
+        [InlineKeyboardButton(text="🐢 بحث اختياري عن بدائل أبطأ", callback_data="servers:search_slow")],
         [InlineKeyboardButton(text="⬅️ الرئيسية", callback_data="home")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -47,13 +48,20 @@ def offer_confirm_keyboard(offer_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def destroy_confirm_keyboard() -> InlineKeyboardMarkup:
+def destroy_confirm_keyboard(instance_id: int, nonce: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🗑 نعم، احذف نهائيًا", callback_data="servers:destroy", style="danger")],
+            [InlineKeyboardButton(text="🗑 نعم، احذف نهائيًا", callback_data=f"servers:destroy:{instance_id}:{nonce}", style="danger")],
             [InlineKeyboardButton(text="إلغاء", callback_data="home")],
         ]
     )
+
+
+def pending_rental_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 إعادة التحقق من الطلب السابق", callback_data="servers:reconcile")],
+        [InlineKeyboardButton(text="⬅️ الرئيسية", callback_data="home")],
+    ])
 
 
 def voices_keyboard(voices: list[VoiceProfile], active_id: str | None) -> InlineKeyboardMarkup:

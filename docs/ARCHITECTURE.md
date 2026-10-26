@@ -145,3 +145,12 @@ Temporary-instance secret:
 - one randomly generated Fish API bearer token for the current rental
 
 The Fish API must never be exposed without authentication.
+
+
+## 2026-10-27 runtime consistency and marketplace policy
+
+`Orchestrator` shares `InstanceRuntime.control_lock` for rental and lifecycle transitions. An instance generation invalidates old readiness/status/delete tasks after start/stop/destroy or replacement. Destructive callbacks contain a resource ID and expiring one-use nonce; the runtime validates the stored generation inside the lock. Billing has separate atomic SQLite `BEGIN IMMEDIATE` read/modify/write transactions, not just an in-process lock. Syntheses reserve activity before network I/O; automatic idle destruction rechecks activity and generation inside the lifecycle lock.
+
+A create is sent once (`VastAI(retry=1)`). Before it, the unique label, original pending timestamp, selected price and Fish token are persisted. Complete paged inventory is necessary for reconciliation and deletion confirmation; failed/malformed/partial inventory is never treated as empty. Recovery never issues another create. An ambiguous missing instance remains explicitly pending and warns the owner; only a definitive rejection plus complete absence clears automatically. Recovered billing is a conservative estimate, not a provider invoice.
+
+Marketplace queries union fast-first and price-first candidate pools before local policy checks. Advertised Mbps tiers precede price within each tier; UI displays download, upload, disk bandwidth where present and transfer fees. Unknown speed is not fabricated. The slower-alternatives button changes only the selected snapshot's network floor; the same floor is revalidated before create. Price/VRAM/reliability/verified/ports/disk constraints are never relaxed by that button.

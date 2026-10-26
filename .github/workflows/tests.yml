@@ -4,17 +4,83 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: Python ${{ matrix.python }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          python-version: "3.12"
-      - run: python -m pip install -U pip
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python }}
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-      - run: pip install -e ".[dev]"
-      - run: bash -n scripts/bootstrap_vast.sh
-      - run: python -m compileall -q src tests
-      - run: pytest -q
+      - name: Install locked development dependencies
+        run: |
+          python -m pip install -r requirements-dev.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+          python -m pip check
+      - name: Static and syntax checks
+        run: |
+          ruff check src tests
+          bash -n scripts/bootstrap_env.sh scripts/bootstrap_vast.sh
+          python -m compileall -q src tests
+          git diff --check
+      - name: Regression tests and coverage
+        run: python -m pytest -q --cov=voxpilot --cov-report=term --cov-report=xml --cov-fail-under=58
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: coverage-python-${{ matrix.python }}
+          path: coverage.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+  dependency-report:
+    name: Dependency audit (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-dev.lock
+      # Vast SDK currently pins vulnerable Pillow/cryptography versions.
+      # Keep every finding visible; no ignore-vuln flags or false clean gate.
+      - name: Report all runtime dependency advisories
+        id: audit
+        continue-on-error: true
+        run: python -m pip_audit -r requirements.lock --no-deps --disable-pip --format json --output audit.json
+      - name: Publish audit status without claiming a clean scan
+        if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          echo "## Dependency audit: $AUDIT_OUTCOME (report only)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'See docs/SECURITY.md for unresolved upstream pins. A successful test workflow does not mean this audit is clean.' >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AUDIT_OUTCOME" != success ]; then
+            echo '::warning::Dependency audit has findings or could not complete. Inspect audit.json; known upstream pins remain unresolved.'
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dependency-audit
+          path: audit.json
+          retention-days: 14
+          if-no-files-found: warn

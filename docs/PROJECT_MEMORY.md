@@ -1,5 +1,21 @@
 # VoxPilot — Project Memory
 
+## 2026-10-27 — Owner-approved audit and network hardening
+
+Plan: `plans/0008-audit-and-network-hardening.md`. Implementation is complete in the maintenance change; integrate through the reviewed PR only after matching Python 3.11/3.12/3.13 CI. The 2026-10-20 deployment below is historical evidence and does not deploy this newer code.
+
+- Atomic SQLite billing transactions prevent double accumulation and close connections explicitly.
+- Generation-bound lifecycle tasks, serialized rental/recovery/start/stop/destroy, and expiring one-use resource-bound deletion confirmations prevent stale operations affecting another instance.
+- Unknown create outcomes are not retried. Unique-label reconciliation uses complete provider inventory, runs on startup/status/Cost Guard, and surfaces pending status and warnings. Only a definitive provider rejection plus a successful empty lookup automatically releases the pending guard; ambiguous absence alone is not proof that no paid instance exists.
+- Search unions fast-first and price-first live pools; ranks advertised download speed tiers then price, with 500 Mbps minimum download, 1000 Mbps preferred, 50 Mbps minimum upload by default. Slower 100 Mbps alternatives require an explicit UI choice. Existing configured price caps, VRAM, reliability, disk, ports and click-time revalidation remain enforced.
+- Bootstrap restores approved PID1 environment variables before defaults and supports immutable controller refs. Model revision is configurable but remains `main` until a verified weights commit is selected; no invented pin or cached-weight replacement.
+- Telegram public download limit is clamped at 20 MB; size-bounded downloads fail safely. Home, /start and /cancel clear wizard state; canceled/in-flight uploads cannot revive it.
+- Locked Python dependencies, static checks, measured coverage and a 3-version CI matrix are included. The security audit is explicitly **report-only, not clean**: upstream Vast SDK pins vulnerable Pillow 12.2.0 and cryptography 49.0.0. The newer Vast 1.9.1 was checked and still prevents the required Pillow upgrade; no dependency metadata was bypassed.
+
+Validation: 149 local Python 3.13 regression tests pass, including the original 90 and 59 new cases. Ruff, compilation, shell syntax and whitespace checks are required alongside matching remote CI. Tests use temporary SQLite databases, fake provider responses and synthetic bytes; they do not establish real download throughput or audio quality.
+
+Remaining boundaries: HTTPS/TLS changes explicitly deferred by the owner; no current controller connection, deployment, restart, paid Vast operation or real voice generation was performed. Branch protection requires repository-administration permission unavailable to this connection and is not asserted enabled. Live acceptance in plan 0004 remains open. Review the new [upgrade checklist](AUDIT_REPAIRS_2026-10-27.md) before deployment; preserve `.env`, SQLite and saved voices.
+
 ## Current goal
 
 VoxPilot is a personal, owner-only Telegram bot for generating speech and cloning voices with Fish Audio S2 Pro on temporary Vast.ai GPU instances rented by the hour.

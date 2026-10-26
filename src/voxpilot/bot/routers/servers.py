@@ -8,7 +8,10 @@ from aiogram import Router
 from aiogram.types import CallbackQuery
 
 from voxpilot.bot.callbacks import safe_callback_answer, safe_edit_text
-from voxpilot.bot.keyboards import destroy_confirm_keyboard, main_menu, offer_confirm_keyboard, offers_keyboard
+from voxpilot.bot.keyboards import (
+    destroy_confirm_keyboard, main_menu, offer_confirm_keyboard, offers_keyboard, pending_rental_keyboard,
+)
+from voxpilot.services.instance_runtime import StaleConfirmation
 from voxpilot.services.audio_probe import ReferenceAudioError, ReferenceAudioTooLong
 from voxpilot.services.orchestrator import OfferUnavailableError, Orchestrator
 from voxpilot.services.voice_store import VoiceStore
@@ -74,14 +77,15 @@ def _billing_lines(billing: Any, *, final: bool = False) -> list[str]:
         return []
     active_seconds = float(billing.get("active_seconds") or 0.0)
     cost = float(billing.get("estimated_cost_usd") or 0.0)
-    label = "التكلفة النهائية المقدرة" if final else "التكلفة حتى الآن"
+    label = "التكلفة النهائية المقدرة" if final else "تكلفة التشغيل المقدرة"
     return [
         f"⏱ وقت التشغيل المحتسب: <b>{_format_duration(active_seconds)}</b>",
         f"💵 {label}: <b>${cost:.4f}</b>",
+        *(["ℹ️ تقدير محافظ بعد استعادة الطلب؛ قد تختلف الفاتورة الفعلية."] if billing.get("recovered_estimate") else []),
     ]
 
 
-@router.callback_query(lambda q: q.data == "servers:search")
+@router.callback_query(lambda q: q.data in {"servers:search", "servers:search_slow"})
 async def search(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback, "جاري التحديث...")
     await safe_edit_text(callback.message, "🔎 أبحث عن عروض مناسبة الآن...")
@@ -89,9 +93,9 @@ async def search(callback: CallbackQuery) -> None:
     if not isinstance(previous, list):
         previous = []
     try:
-        offers = await orch().offers()
+        offers = await orch().offers(allow_slow=callback.data == "servers:search_slow")
     except Exception:
-        logger.exception("Vast offer search failed")
+        logger.warning("Vast offer search failed")
         await safe_edit_text(callback.message, "❌ تعذر البحث في Vast.ai الآن.", reply_markup=main_menu())
         return
     refresh_no = int(await orch().db.get("offers.refresh_serial", 0) or 0) + 1
@@ -99,15 +103,18 @@ async def search(callback: CallbackQuery) -> None:
     if not offers:
         await safe_edit_text(
             callback.message,
-            f"🔄 <b>تحديث السوق #{refresh_no}</b>\n\nلا توجد عروض مطابقة للشروط حاليًا.",
-            reply_markup=main_menu(),
+            f"🔄 <b>تحديث السوق #{refresh_no}</b>\n\nلا توجد عروض مطابقة لشروط هذا البحث حاليًا. "
+            "يمكنك إعادة البحث أو اختيار بدائل أبطأ دون رفع سقف السعر.",
+            reply_markup=offers_keyboard([]),
         )
         return
     note = _refresh_note(previous, offers, refresh_no)
     await safe_edit_text(
         callback.message,
         f"🧾 <b>العروض المناسبة</b>\n{note}\n"
-        f"المطابق الآن: <b>{len(offers)}</b>\n\nاختر عرضًا لمراجعة التفاصيل:",
+        f"المطابق الآن: <b>{len(offers)}</b>\n"
+        + ("⚠️ هذه بدائل أبطأ اخترت إظهارها يدويًا.\n" if callback.data == "servers:search_slow" else "الأولوية لفئات سرعة التنزيل الأعلى، ثم السعر داخل الفئة.\n")
+        + "سرعات الشبكة معلنة من المزود وليست قياسًا مضمونًا.\n\nاختر عرضًا لمراجعة التفاصيل:",
         reply_markup=offers_keyboard(offers),
     )
 
@@ -128,10 +135,21 @@ async def offer_details(callback: CallbackQuery) -> None:
         f"الموثوقية: <b>{'?' if offer.reliability is None else f'{offer.reliability * 100:.1f}%'} </b>",
     ]
     if offer.inet_down_mbps:
-        lines.append(f"سرعة التنزيل: <b>{offer.inet_down_mbps:.0f} Mbps</b>")
+        lines.append(f"التنزيل المعلن: <b>{offer.inet_down_mbps:.0f} Mbps</b> (نظريًا {offer.inet_down_mbps / 8:.1f} MB/s)")
+    if offer.inet_up_mbps is not None:
+        lines.append(f"الرفع المعلن: <b>{offer.inet_up_mbps:.0f} Mbps</b>")
+    if offer.disk_bw_mbps is not None:
+        lines.append(f"قراءة القرص المعلنة: <b>{offer.disk_bw_mbps:.0f} MB/s</b>")
+    for direction, cost in (("التنزيل", offer.inet_down_cost_per_gb), ("الرفع", offer.inet_up_cost_per_gb)):
+        if cost is not None:
+            lines.append(f"رسوم نقل {direction}: <b>${cost:.4f}/GB</b>")
+    if offer.network_fallback:
+        lines.append("⚠️ عرض من البحث الاختياري الأبطأ؛ قد يستغرق التحميل وقتًا أطول.")
     if offer.location:
         lines.append(f"الموقع: <b>{escape(offer.location)}</b>")
-    lines += ["", "سيُعاد فحص السوق والسعر قبل الاستئجار مباشرة."]
+    lines += ["", "السرعات معلنة؛ قد يحد مصدر التحميل أو القرص من السرعة الفعلية.",
+              "عداد التشغيل تقديري، ولا يشمل كل رسوم النقل أو التخزين المتغيرة.",
+              "سيُعاد فحص السوق والسعر قبل الاستئجار مباشرة."]
     await safe_edit_text(callback.message, "\n".join(lines), reply_markup=offer_confirm_keyboard(offer_id))
 
 
@@ -157,7 +175,7 @@ async def rent(callback: CallbackQuery) -> None:
         try:
             offers = await orch().offers(exclude_offer_ids={offer_id})
         except Exception:
-            logger.exception("Vast refresh after unavailable offer failed")
+            logger.warning("Vast refresh after unavailable offer failed")
             await safe_edit_text(
                 callback.message,
                 "⚠️ <b>العرض لم يعد متاحًا</b>\n\nلم يتم إنشاء أي سيرفر. حدّث العروض واختر عرضًا آخر.",
@@ -179,10 +197,13 @@ async def rent(callback: CallbackQuery) -> None:
         )
         return
     except Exception:
-        logger.exception("Vast rent/provision failed")
+        logger.warning("Vast rent/provision failed")
         try:
             state = await orch().current_state(probe_fish=False)
             billing = state.get("billing")
+            if state.get("pending"):
+                await safe_edit_text(callback.message, _pending_text(state), reply_markup=pending_rental_keyboard())
+                return
         except Exception:
             billing = None
         lines = [
@@ -205,8 +226,11 @@ async def status(callback: CallbackQuery) -> None:
     try:
         state = await orch().current_state(probe_fish=True)
     except Exception:
-        logger.exception("Server status failed")
+        logger.warning("Server status failed")
         await safe_edit_text(callback.message, "❌ تعذر قراءة حالة السيرفر.", reply_markup=main_menu())
+        return
+    if state.get("pending"):
+        await safe_edit_text(callback.message, _pending_text(state), reply_markup=pending_rental_keyboard())
         return
     if not state.get("instance_id"):
         await safe_edit_text(callback.message, "📊 <b>حالة السيرفر</b>\n\nلا يوجد سيرفر حالي.", reply_markup=main_menu())
@@ -253,7 +277,7 @@ async def stop(callback: CallbackQuery) -> None:
     try:
         stopped = await orch().stop_current()
     except Exception:
-        logger.exception("Server stop failed")
+        logger.warning("Server stop failed")
         await safe_edit_text(callback.message, "❌ تعذر إيقاف السيرفر.", reply_markup=main_menu())
         return
     if not stopped:
@@ -274,7 +298,7 @@ async def start_instance(callback: CallbackQuery) -> None:
     try:
         started = await orch().start_current()
     except Exception:
-        logger.exception("Server start failed")
+        logger.warning("Server start failed")
         await safe_edit_text(callback.message, "❌ تعذر تشغيل السيرفر أو لم يصبح Fish جاهزًا.", reply_markup=main_menu())
         return
     if not started:
@@ -288,33 +312,74 @@ async def start_instance(callback: CallbackQuery) -> None:
     await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())
 
 
+def _pending_text(state: dict[str, Any]) -> str:
+    detail = {
+        "multiple_matches": "ظهرت عدة موارد بنفس علامة الطلب؛ يلزم مراجعتها في Vast دون اختيار واحد عشوائيًا.",
+        "inventory_unavailable": "تعذرت قراءة قائمة السيرفرات من Vast الآن.",
+        "awaiting_provider": "لم يتضح بعد هل أنشأ Vast السيرفر أم لا.",
+        "creating": "طلب الإنشاء قيد التحقق.",
+    }.get(state.get("pending_status"), "لم تُحسم نتيجة الطلب السابق بعد.")
+    return ("⚠️ <b>استئجار غير محسوم</b>\n\n" + detail +
+            "\nقد يوجد سيرفر مدفوع. أُعيد التحقق دوريًا، وأمنع إنشاء سيرفر ثانٍ حتى حسم الطلب. "
+            "لن يُحذف أي سيرفر تلقائيًا بسبب هذا الغموض.")
+
+
+@router.callback_query(lambda q: q.data == "servers:reconcile")
+async def reconcile(callback: CallbackQuery) -> None:
+    await safe_callback_answer(callback, "أتحقق من الطلب السابق...")
+    try:
+        result = await orch().reconcile_pending()
+        if result["status"] == "recovered":
+            text = "✅ عُثر على السيرفر السابق واستُعيد تتبعه. يجري التحقق من جاهزيته، دون استئجار سيرفر جديد."
+        elif result["status"] == "rejected":
+            text = "✅ تأكد رفض الطلب السابق ولم يظهر سيرفر مطابق له. يمكنك البحث عن عرض آخر."
+        elif result["status"] == "not_pending":
+            text = "لا يوجد طلب معلّق الآن. راجع حالة السيرفر الحالية."
+        else:
+            state = await orch().current_state()
+            await safe_edit_text(callback.message, _pending_text(state), reply_markup=pending_rental_keyboard())
+            return
+        await safe_edit_text(callback.message, text, reply_markup=main_menu())
+    except Exception as exc:
+        logger.warning("Pending rental check failed: %s", type(exc).__name__)
+        await safe_edit_text(callback.message, "تعذر التحقق الآن. احتفظت بحماية منع الاستئجار المكرر.",
+                             reply_markup=pending_rental_keyboard())
+
+
 @router.callback_query(lambda q: q.data == "servers:destroy_confirm")
 async def destroy_confirm(callback: CallbackQuery) -> None:
     await safe_callback_answer(callback)
     try:
-        state = await orch().current_state(probe_fish=False)
-        billing = state.get("billing")
+        confirmation = await orch().prepare_destroy_confirmation()
     except Exception:
-        billing = None
-    lines = ["⚠️ سيتم حذف السيرفر نهائيًا وإيقافه."]
-    lines += _billing_lines(billing)
-    lines += ["", "هل أنت متأكد؟"]
-    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=destroy_confirm_keyboard())
+        await safe_edit_text(callback.message, "لا يمكن إنشاء تأكيد حذف الآن. راجع حالة السيرفر.", reply_markup=main_menu())
+        return
+    lines = ["⚠️ سيتم حذف هذا السيرفر نهائيًا وإيقافه."]
+    lines += _billing_lines(confirmation.get("billing"))
+    lines += ["", "هذا التأكيد مرتبط بالسيرفر الحالي وله صلاحية محدودة. هل أنت متأكد؟"]
+    await safe_edit_text(callback.message, "\n".join(lines), reply_markup=destroy_confirm_keyboard(
+        confirmation["instance_id"], confirmation["nonce"]))
 
 
-@router.callback_query(lambda q: q.data == "servers:destroy")
+@router.callback_query(lambda q: q.data == "servers:destroy" or q.data and q.data.startswith("servers:destroy:"))
 async def destroy(callback: CallbackQuery) -> None:
-    await safe_callback_answer(callback, "جاري الحذف...")
+    await safe_callback_answer(callback)
     try:
-        destroyed = await orch().destroy_current()
-    except Exception:
-        logger.exception("Server destroy failed")
-        await safe_edit_text(callback.message, "❌ تعذر حذف السيرفر.", reply_markup=main_menu())
+        parts = (callback.data or "").split(":")
+        if len(parts) != 4 or not parts[2].isdigit() or len(parts[3]) != 16:
+            raise StaleConfirmation("Legacy or invalid confirmation")
+        destroyed = await orch().destroy_current(expected_instance_id=int(parts[2]), confirmation_nonce=parts[3])
+    except StaleConfirmation:
+        await safe_edit_text(callback.message, "⚠️ التأكيد قديم أو تغيّر السيرفر. لم أرسل طلب حذف؛ افتح تأكيدًا جديدًا.", reply_markup=main_menu())
+        return
+    except Exception as exc:
+        logger.warning("Server destroy confirmation failed: %s", type(exc).__name__)
+        await safe_edit_text(callback.message, "⚠️ لم يتأكد اكتمال الحذف. احتفظت بتتبع السيرفر والعداد؛ راجع حالته.", reply_markup=main_menu())
         return
     if not destroyed:
         await safe_edit_text(callback.message, "لا يوجد سيرفر حالي.", reply_markup=main_menu())
         return
     billing = await orch().last_billing_snapshot()
-    lines = ["🗑 تم حذف السيرفر نهائيًا."]
+    lines = ["🗑 تم تأكيد حذف السيرفر نهائيًا."]
     lines += _billing_lines(billing, final=True)
     await safe_edit_text(callback.message, "\n".join(lines), reply_markup=main_menu())

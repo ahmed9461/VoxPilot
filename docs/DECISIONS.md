@@ -211,3 +211,20 @@ Supersede the unconditional default-on upgrade rule above: enable consistency by
 Treat square-bracket tags as opaque. Preserve complete nested, mixed-width, multiline, and malformed parenthetical groups instead of converting inner fragments. Do not create nested Fish tags from parentheses containing square brackets.
 
 Reason: PR #1 review reproduced mutations inside manual Fish tags and nested parentheses; the old upgrade fallback silently replaced effective sampling values with the consistency preset. Both violate the intended compatibility boundary. A local SQLite migration/restart test now verifies preservation without accessing controller data.
+
+
+## 2026-10-27 — Prioritize network readiness without increasing budget
+
+Use two fresh offer pools (download-first and price-first), speed tiers and price within each tier rather than a cheap-only shortlist or an unbounded speed bonus. Defaults: download floor 500 Mbps, preferred 1000 Mbps, upload floor 50 Mbps. Slow alternatives are opt-in with a 100 Mbps floor. Report advertised Mbps and theoretical MB/s separately; do not promise measured Hugging Face throughput or faster initialization without live evidence. Keep the current hourly ceiling unchanged.
+
+## 2026-10-27 — Fail safely on ambiguous rental outcomes
+
+Disable SDK transport retries for create. Persist the intent first, reconcile by unique label, retain pending status across restarts, and never infer definitive nonexistence from an API error or one ambiguous empty response. Preserve the guard until an existing instance is adopted or a definitive rejection is followed by complete absence. Do not add an automatic force-reset or silently delete a paid instance to resolve ambiguity.
+
+## 2026-10-27 — Bind tasks and destructive intent to resource generations
+
+Use the shared lifecycle lock plus generation checks around asynchronous work. Expiring single-use deletion confirmation binds instance ID and generation. Billing is an atomic database transaction. Explicitly close connections. Home/start/cancel clear the voice wizard; an upload operation token prevents late download/validation completion from reviving canceled state.
+
+## 2026-10-27 — Preserve explicit transport deferral and expose dependency risk
+
+HTTPS/TLS defaults are unchanged at the owner's explicit request. Bearer authentication remains mandatory; HTTP still has transport confidentiality risk. Keep the tested official Vast 1.6.0 rather than silently overriding its package metadata: even candidate Vast 1.9.1 forces Pillow 12.2.0. Record vulnerable dependency pins, publish the full pip-audit result without ignores, and label that CI job report-only until upstream is compatible with patched dependencies or a separately tested integration replacement is approved. Never describe green regression CI as a clean security audit.

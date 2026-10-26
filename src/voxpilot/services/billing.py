@@ -5,6 +5,11 @@ from typing import Any
 
 from voxpilot.db import Database
 
+BILLING_KEYS = (
+    "billing.started_at", "billing.active_since", "billing.active_seconds",
+    "billing.price_per_hour", "billing.recovered_estimate",
+)
+
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
@@ -22,33 +27,58 @@ def _parse_timestamp(value: Any) -> datetime | None:
     return stamp.astimezone(UTC)
 
 
-async def begin_billing(db: Database, price_per_hour: float, *, now: datetime | None = None) -> None:
+def _snapshot(values: dict[str, Any], stamp: datetime) -> dict[str, Any] | None:
+    price = values.get("billing.price_per_hour")
+    started = _parse_timestamp(values.get("billing.started_at"))
+    if price is None or started is None:
+        return None
+    seconds = float(values.get("billing.active_seconds") or 0.0)
+    active = _parse_timestamp(values.get("billing.active_since"))
+    if active is not None:
+        seconds += max(0.0, (stamp - active).total_seconds())
+    return {
+        "started_at": started.isoformat(), "active": active is not None,
+        "active_seconds": seconds,
+        "elapsed_seconds": max(0.0, (stamp - started).total_seconds()),
+        "price_per_hour": float(price),
+        "estimated_cost_usd": seconds * float(price) / 3600.0,
+        "measured_at": stamp.isoformat(),
+        "recovered_estimate": bool(values.get("billing.recovered_estimate")),
+    }
+
+
+async def begin_billing(db: Database, price_per_hour: float, *, now: datetime | None = None, recovered: bool = False) -> None:
     stamp = (now or _utc_now()).astimezone(UTC)
-    await db.set_many(
-        {
+    def begin(values):
+        if values.get("billing.started_at"):
+            return {}, None
+        return {
             "billing.started_at": stamp.isoformat(),
             "billing.active_since": stamp.isoformat(),
             "billing.active_seconds": 0.0,
             "billing.price_per_hour": float(price_per_hour),
-        }
-    )
+            "billing.recovered_estimate": recovered,
+        }, None
+    await db.transaction(BILLING_KEYS, begin)
 
 
 async def pause_billing(db: Database, *, now: datetime | None = None) -> None:
     stamp = (now or _utc_now()).astimezone(UTC)
-    active_since = _parse_timestamp(await db.get("billing.active_since"))
-    if active_since is None:
-        return
-    accumulated = float(await db.get("billing.active_seconds", 0.0) or 0.0)
-    accumulated += max(0.0, (stamp - active_since).total_seconds())
-    await db.set_many({"billing.active_seconds": accumulated, "billing.active_since": None})
+    def pause(values):
+        snapshot = _snapshot(values, stamp)
+        if snapshot is None or not snapshot["active"]:
+            return {}, None
+        return {"billing.active_seconds": snapshot["active_seconds"], "billing.active_since": None}, None
+    await db.transaction(BILLING_KEYS, pause)
 
 
 async def resume_billing(db: Database, *, now: datetime | None = None) -> None:
-    if await db.get("billing.active_since"):
-        return
     stamp = (now or _utc_now()).astimezone(UTC)
-    await db.set("billing.active_since", stamp.isoformat())
+    def resume(values):
+        if not values.get("billing.started_at") or values.get("billing.active_since"):
+            return {}, None
+        return {"billing.active_since": stamp.isoformat()}, None
+    await db.transaction(BILLING_KEYS, resume)
 
 
 async def sync_billing_status(db: Database, status: str, *, now: datetime | None = None) -> None:
@@ -60,42 +90,20 @@ async def sync_billing_status(db: Database, status: str, *, now: datetime | None
 
 
 async def billing_snapshot(db: Database, *, now: datetime | None = None) -> dict[str, Any] | None:
-    price = await db.get("billing.price_per_hour")
-    started_at = _parse_timestamp(await db.get("billing.started_at"))
-    if price is None or started_at is None:
-        return None
-    stamp = (now or _utc_now()).astimezone(UTC)
-    active_seconds = float(await db.get("billing.active_seconds", 0.0) or 0.0)
-    active_since = _parse_timestamp(await db.get("billing.active_since"))
-    if active_since is not None:
-        active_seconds += max(0.0, (stamp - active_since).total_seconds())
-    price_per_hour = float(price)
-    return {
-        "started_at": started_at.isoformat(),
-        "active": active_since is not None,
-        "active_seconds": active_seconds,
-        "elapsed_seconds": max(0.0, (stamp - started_at).total_seconds()),
-        "price_per_hour": price_per_hour,
-        "estimated_cost_usd": active_seconds * price_per_hour / 3600.0,
-        "measured_at": stamp.isoformat(),
-    }
+    return _snapshot(await db.get_many(BILLING_KEYS), (now or _utc_now()).astimezone(UTC))
 
 
 async def finalize_billing(db: Database, *, now: datetime | None = None) -> dict[str, Any] | None:
     stamp = (now or _utc_now()).astimezone(UTC)
-    await pause_billing(db, now=stamp)
-    snapshot = await billing_snapshot(db, now=stamp)
-    if snapshot is not None:
-        await db.set("billing.last", snapshot)
-    await db.set_many(
-        {
-            "billing.started_at": None,
-            "billing.active_since": None,
-            "billing.active_seconds": None,
-            "billing.price_per_hour": None,
-        }
-    )
-    return snapshot
+    def finalize(values):
+        snapshot = _snapshot(values, stamp)
+        if snapshot is None:
+            return {}, None
+        snapshot["active"] = False
+        updates = {key: None for key in BILLING_KEYS}
+        updates["billing.last"] = snapshot
+        return updates, snapshot
+    return await db.transaction(BILLING_KEYS, finalize)
 
 
 async def last_billing_snapshot(db: Database) -> dict[str, Any] | None:
