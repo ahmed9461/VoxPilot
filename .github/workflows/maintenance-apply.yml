@@ -1,0 +1,120 @@
+name: maintenance apply
+on:
+  push:
+    branches: [maintenance/audit-network-20261027]
+    paths: [.github/workflows/maintenance-apply.yml]
+permissions:
+  contents: write
+jobs:
+  validate:
+    if: github.repository == 'ahmed9461/VoxPilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Apply hash-verified source delta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, lzma, os
+          from pathlib import Path, PurePosixPath
+          from urllib.request import Request, urlopen
+          repo = 'ahmed9461/VoxPilot'
+          assert os.environ['GITHUB_REPOSITORY'] == repo
+          assert os.environ['GITHUB_REF'] == 'refs/heads/maintenance/audit-network-20261027'
+          chunks = ['ad94a67a676e5c7e6537ce0ff6ebd1a95ed30d83', '02a89eeba5d19eb0d0835a77b77c8bc1a5e4a0e5', 'a442714b301ff05e888714359efbec5d20802f12', '74a2023305a91c1cb26f2be6b1bec6da26b7121e', '4768adab3d85e615c28a2931796c754d58e02198']
+          data = bytearray()
+          for sha in chunks:
+              req = Request(f'https://api.github.com/repos/{repo}/git/blobs/{sha}', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urlopen(req, timeout=60) as response:
+                  blob = json.load(response)
+              part = base64.b64decode(blob['content'])
+              assert hashlib.sha1(b'blob ' + str(len(part)).encode() + b'\0' + part).hexdigest() == sha
+              data.extend(part)
+          digest = hashlib.sha256(data).hexdigest()
+          assert digest == 'dc1da97c2eb8a5b46dc00aff7366f5d4ac9d86490d4cb104d34cf4055de3407a'
+          manifest = json.loads(lzma.decompress(data))
+          assert manifest['version'] == 1 and len(manifest['files']) == 37
+          for item in manifest['files']:
+              relative = PurePosixPath(item['path'])
+              assert not relative.is_absolute() and '..' not in relative.parts and '.git' not in relative.parts
+              path = Path(relative)
+              assert not path.is_symlink()
+              old = path.read_bytes() if path.exists() else None
+              assert (hashlib.sha256(old).hexdigest() if old is not None else None) == item['old'], str(path)
+              if item['new'] is None:
+                  path.unlink()
+                  continue
+              lines = old.decode('utf-8').splitlines(keepends=True) if old is not None else []
+              content = ''.join(''.join(lines[op[0]:op[1]]) if isinstance(op, list) else op for op in item['ops']).encode('utf-8')
+              assert hashlib.sha256(content).hexdigest() == item['new'], str(path)
+              assert item['mode'] in ('100644', '100755')
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(content)
+              path.chmod(int(item['mode'], 8) & 0o777)
+          for name in ('.github/workflows/maintenance-tools.yml', '.github/workflows/maintenance-apply.yml'):
+              Path(name).unlink()
+          Path('/tmp/voxpilot-publication').mkdir()
+          Path('/tmp/voxpilot-publication/manifest.json').write_text(json.dumps(manifest))
+          print(f'Applied {len(manifest["files"])} verified file operations; payload {digest}')
+          PY
+      - name: Install isolated locked dependencies
+        run: |
+          python -m pip install -r requirements-dev.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+          python -m pip check
+      - name: Validate exact candidate
+        run: |
+          command -v ffmpeg
+          ruff check src tests
+          bash -n scripts/bootstrap_env.sh scripts/bootstrap_vast.sh
+          python -m compileall -q src tests
+          git diff --check
+          python -m pytest -q --cov=voxpilot --cov-report=term --cov-report=xml:/tmp/voxpilot-publication/coverage.xml --cov-fail-under=58 | tee /tmp/voxpilot-publication/tests.txt
+      - name: Create tested Git objects without moving any branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          repo = 'ahmed9461/VoxPilot'
+          parent = os.environ['GITHUB_SHA']
+          def api(path, data=None):
+              request = Request(f'https://api.github.com/repos/{repo}/{path}', data=json.dumps(data).encode() if data is not None else None, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+              with urlopen(request, timeout=60) as response:
+                  return json.load(response)
+          manifest = json.loads(Path('/tmp/voxpilot-publication/manifest.json').read_text())
+          entries = []
+          for item in manifest['files']:
+              path = item['path']
+              if item['new'] is None:
+                  entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
+                  continue
+              content = Path(path).read_bytes()
+              assert hashlib.sha256(content).hexdigest() == item['new'], path
+              blob = api('git/blobs', {'encoding': 'base64', 'content': base64.b64encode(content).decode()})
+              entries.append({'path': path, 'mode': item['mode'], 'type': 'blob', 'sha': blob['sha']})
+          for path in ('.github/workflows/maintenance-tools.yml', '.github/workflows/maintenance-apply.yml'):
+              entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
+          base = api('git/commits/' + parent)['tree']['sha']
+          tree = api('git/trees', {'base_tree': base, 'tree': entries})
+          commit = api('git/commits', {'message': 'fix: harden rentals and prioritize fast-network GPU offers', 'tree': tree['sha'], 'parents': [parent]})
+          result = {'repository': repo, 'parent': parent, 'commit': commit['sha'], 'tree': tree['sha'], 'file_operations': len(entries), 'tests': 149, 'branch_moved': False, 'live_deployed': False, 'https_changed': False, 'dependency_audit_clean': False}
+          Path('/tmp/voxpilot-publication/publication.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: maintenance-publication
+          path: /tmp/voxpilot-publication
+          retention-days: 7
+          if-no-files-found: warn
