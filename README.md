@@ -44,7 +44,8 @@ Fish's official docs currently recommend at least 24 GB VRAM for S2 inference.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -r requirements.lock
+pip install --no-deps -e .
 cp .env.example .env
 # fill TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID, VAST_API_KEY
 voxpilot
@@ -77,3 +78,12 @@ Read these before making changes:
 - `ROADMAP.md`
 - active plan under `plans/`
 - `docs/PROGRESS_LOG.md`
+
+
+## Audit/network maintenance (2026-10-27)
+
+Fast-network search defaults to advertised download >=500 Mbps, prefers >=1000 Mbps, and requires upload >=50 Mbps while preserving the configured hourly ceiling. The UI provides explicit slower alternatives instead of silently relaxing the fast search. Existing `.env` overrides are preserved. See [repair and upgrade notes](docs/AUDIT_REPAIRS_2026-10-27.md).
+
+An unresolved rental is reconciled without retrying create. Never manually clear a pending label merely because a timeout occurred. Full dependency-audit findings remain visible: a green regression workflow is not a clean vulnerability scan; see [security limitations](docs/SECURITY.md#known-upstream-dependency-blocker-2026-10-27).
+
+Developer checks: `pip install -r requirements-dev.lock`, `pip install --no-deps -e .`, `ruff check src tests`, and `pytest --cov=voxpilot`. Exact dependency locks are regenerated with `uv pip compile pyproject.toml --universal --no-header --no-annotate` (add `--extra dev` for the development lock); review upgrades and run every supported CI version before adoption.

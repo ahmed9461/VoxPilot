@@ -27,8 +27,17 @@ async def test_long_upload_keeps_voice_wizard_on_audio_step():
             self.replies.append(text)
 
     class State:
+        data = {}
+
         async def update_data(self, **kwargs):
-            raise AssertionError("Invalid audio must not be stored in wizard state")
+            assert set(kwargs) == {"upload_id"}, "Invalid audio must not be stored in wizard state"
+            self.data.update(kwargs)
+
+        async def get_data(self):
+            return self.data.copy()
+
+        async def get_state(self):
+            return voices.VoiceWizard.audio.state
 
         async def set_state(self, state):
             raise AssertionError("Wizard must remain on audio step")

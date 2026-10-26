@@ -3,6 +3,8 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+import math
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,7 +20,7 @@ class Settings(BaseSettings):
     database_path: Path = Path("./data/voxpilot.sqlite3")
     voice_data_dir: Path = Path("./data/voices")
     log_level: str = "INFO"
-    telegram_max_voice_mb: int = 25
+    telegram_max_voice_mb: int = 20
 
     vast_api_key: str = ""
     vast_template_hash: str | None = None
@@ -31,7 +33,12 @@ class Settings(BaseSettings):
     vast_verified_only: bool = True
     vast_datacenter_only: bool = False
     vast_min_direct_ports: int = 1
-    vast_min_inet_down_mbps: float = 100.0
+    vast_min_inet_down_mbps: float = 500.0
+    vast_preferred_inet_down_mbps: float = 1000.0
+    vast_min_inet_up_mbps: float = 50.0
+    vast_slow_inet_down_mbps: float = 100.0
+    pending_rental_warn_seconds: int = 120
+    destroy_confirmation_seconds: int = 300
     vast_cancel_unavailable: bool = True
     vast_auto_destroy_on_provision_failure: bool = False
 
@@ -41,6 +48,7 @@ class Settings(BaseSettings):
     fish_speech_repo_url: str = "https://github.com/fishaudio/fish-speech.git"
     fish_speech_ref: str = FISH_PIN
     fish_model_repo: str = "fishaudio/s2-pro"
+    fish_model_revision: str = "main"
     fish_uv_extra: str = "cu126"
     fish_api_port: int = 8080
     fish_compile: bool = False
@@ -73,8 +81,8 @@ class Settings(BaseSettings):
     @field_validator("vast_max_price_usd_hour", "provision_poll_seconds")
     @classmethod
     def positive_float(cls, value: float) -> float:
-        if value <= 0:
-            raise ValueError("value must be > 0")
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("value must be finite and > 0")
         return value
 
     @field_validator(
@@ -89,8 +97,8 @@ class Settings(BaseSettings):
     )
     @classmethod
     def positive_int(cls, value: int) -> int:
-        if value <= 0:
-            raise ValueError("value must be > 0")
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("value must be finite and > 0")
         return value
 
     @field_validator("vast_min_gpu_ram_gb")
@@ -114,6 +122,23 @@ class Settings(BaseSettings):
         if normalized not in {"cu126", "cu128", "cu129"}:
             raise ValueError("FISH_UV_EXTRA must be cu126, cu128, or cu129")
         return normalized
+
+    @field_validator(
+        "vast_min_inet_down_mbps", "vast_preferred_inet_down_mbps",
+        "vast_min_inet_up_mbps", "vast_slow_inet_down_mbps",
+    )
+    @classmethod
+    def network_speed_range(cls, value: float) -> float:
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("Network thresholds must be finite and >= 0")
+        return value
+
+    @field_validator("pending_rental_warn_seconds", "destroy_confirmation_seconds", "cost_guard_poll_seconds")
+    @classmethod
+    def positive_interval(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("Interval must be > 0")
+        return value
 
     def validate_runtime(self) -> None:
         missing: list[str] = []

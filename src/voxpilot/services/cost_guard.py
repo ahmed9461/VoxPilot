@@ -28,9 +28,34 @@ async def cost_guard_loop(bot: Bot, settings: Settings, db: Database, orchestrat
 
 
 async def _tick(bot: Bot, settings: Settings, db: Database, orchestrator: Orchestrator) -> None:
-    instance_id = await db.get("instance.id")
-    phase = await db.get("instance.phase", InstancePhase.NONE.value)
+    values = await db.get_many(["instance.id", "instance.phase", "instance.generation",
+                                "instance.pending_label", "instance.pending_since"])
+    instance_id = values.get("instance.id")
+    phase = values.get("instance.phase", InstancePhase.NONE.value)
     if not instance_id:
+        label = values.get("instance.pending_label")
+        if not label or orchestrator is None:
+            return
+        result = await orchestrator.reconcile_pending()
+        if result["status"] == "recovered":
+            await bot.send_message(settings.owner_telegram_id,
+                "✅ عُثر على السيرفر الناتج عن الطلب السابق واستُعيد تتبعه. يجري التحقق من جاهزيته دون استئجار سيرفر آخر.")
+            return
+        if result["status"] in {"rejected", "not_pending"}:
+            return
+        try:
+            since = datetime.fromisoformat(str(values.get("instance.pending_since")))
+            if since.tzinfo is None:
+                since = since.replace(tzinfo=UTC)
+            age = (datetime.now(UTC) - since).total_seconds()
+        except (TypeError, ValueError):
+            age = settings.pending_rental_warn_seconds  # Legacy unresolved request: warn now.
+        if age >= settings.pending_rental_warn_seconds and await db.get("cost_guard.warned_pending") != label:
+            await bot.send_message(settings.owner_telegram_id,
+                "⚠️ <b>طلب استئجار غير محسوم</b>\nقد يكون لدى Vast سيرفر مدفوع لم يظهر بعد. "
+                "أعيد التحقق دوريًا، ولن أكرر طلب الإنشاء. استخدم «حالة السيرفر» ثم «إعادة التحقق»؛ "
+                "إن استمر الغموض راجع لوحة Vast قبل أي استئجار يدوي.")
+            await db.set("cost_guard.warned_pending", label)
         return
 
     if phase in {
@@ -86,7 +111,10 @@ async def _tick(bot: Bot, settings: Settings, db: Database, orchestrator: Orches
     auto_after = settings.cost_guard_auto_destroy_minutes
     if auto_after > 0 and idle_minutes >= auto_after:
         try:
-            destroyed = await orchestrator.destroy_current()
+            destroyed = await orchestrator.destroy_current(
+                expected_instance_id=instance_id, expected_generation=values.get("instance.generation"),
+                expected_idle_since=stamp,
+            )
         except Exception:
             await bot.send_message(settings.owner_telegram_id, "⚠️ تعذر على حارس التكلفة حذف السيرفر تلقائيًا. راجع حالته من البوت.")
             return

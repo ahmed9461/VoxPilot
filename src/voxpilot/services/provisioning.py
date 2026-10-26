@@ -11,8 +11,10 @@ def extract_instance_id(result: dict[str, Any]) -> int | None:
         value = result.get(key)
         if value:
             try:
-                return int(value)
-            except (TypeError, ValueError):
+                parsed = int(value)
+                if parsed > 0:
+                    return parsed
+            except (TypeError, ValueError, OverflowError):
                 pass
     for key in ("instance", "contract", "result"):
         nested = result.get(key)
@@ -35,6 +37,7 @@ def build_vast_env(settings: Settings, fish_token: str) -> str:
         "FISH_SPEECH_REPO_URL": settings.fish_speech_repo_url,
         "FISH_SPEECH_REF": settings.fish_speech_ref,
         "FISH_MODEL_REPO": settings.fish_model_repo,
+        "FISH_MODEL_REVISION": settings.fish_model_revision,
         "FISH_UV_EXTRA": settings.fish_uv_extra,
         "FISH_COMPILE": "1" if settings.fish_compile else "0",
         "FISH_HALF": "1" if settings.fish_half else "0",
@@ -53,8 +56,9 @@ def build_onstart_cmd(settings: Settings) -> str | None:
     repo = shlex.quote(settings.voxpilot_repo_url)
     ref = shlex.quote(settings.voxpilot_repo_ref)
     return (
-        f"if [ ! -d {root}/.git ]; then "
-        f"git clone --depth 1 --branch {ref} {repo} {root}; "
-        f"else git -C {root} fetch --depth 1 origin {ref} && git -C {root} reset --hard FETCH_HEAD; fi; "
-        f"nohup bash {root}/scripts/bootstrap_vast.sh > /workspace/voxpilot-bootstrap.log 2>&1 &"
+        f"(set -e; if [ ! -d {root}/.git ]; then "
+        f"mkdir -p {root}; git -C {root} init; git -C {root} remote add origin {repo}; fi; "
+        f"git -C {root} fetch --depth 1 origin {ref}; "
+        f"git -C {root} reset --hard FETCH_HEAD; "
+        f"nohup bash {root}/scripts/bootstrap_vast.sh > /workspace/voxpilot-bootstrap.log 2>&1 &)"
     )

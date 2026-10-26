@@ -30,11 +30,17 @@ class GpuOffer:
     disk_space_gb: float | None = None
     verified: bool | None = None
     raw: dict[str, Any] | None = None
+    inet_up_mbps: float | None = None
+    disk_bw_mbps: float | None = None
+    inet_down_cost_per_gb: float | None = None
+    inet_up_cost_per_gb: float | None = None
+    network_fallback: bool = False
 
     @property
     def display_name(self) -> str:
         rel = "?" if self.reliability is None else f"{self.reliability * 100:.1f}%"
-        return f"{self.gpu_name} • {self.gpu_ram_gb:.0f}GB • ${self.price_per_hour:.3f}/h • R {rel}"
+        speed = "?" if self.inet_down_mbps is None else f"{self.inet_down_mbps:.0f}"
+        return f"{self.gpu_name} • ${self.price_per_hour:.3f}/h • ↓{speed} Mbps • R {rel}"
 
     def public_dict(self) -> dict[str, Any]:
         data = asdict(self)

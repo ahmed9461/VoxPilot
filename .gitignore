@@ -13,3 +13,9 @@ voices/
 generated/
 .DS_Store
 .lesshst
+
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+audit.json

@@ -124,7 +124,7 @@ async def test_recovery_waits_for_pending_boot_instead_of_marking_it_stopped(tmp
     vast = DelayedVast()
     runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
 
-    async def ready(instance_id, progress=None):
+    async def ready(instance_id, progress=None, *, expected_generation=None):
         await db.set("instance.phase", InstancePhase.READY.value)
 
     runtime.wait_until_ready = ready
@@ -146,7 +146,7 @@ async def test_recovery_moves_stopped_record_back_to_booting_when_provider_is_ru
     vast.running = True
     runtime = InstanceRuntime(Settings(), db, vast)
 
-    async def ready(instance_id, progress=None):
+    async def ready(instance_id, progress=None, *, expected_generation=None):
         assert await db.get("instance.phase") == InstancePhase.BOOTING.value
         await db.set("instance.phase", InstancePhase.READY.value)
 
@@ -177,7 +177,7 @@ async def test_recovery_waits_through_provider_start_transition(tmp_path):
     vast = StartingVast()
     runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
 
-    async def ready(instance_id, progress=None):
+    async def ready(instance_id, progress=None, *, expected_generation=None):
         await db.set("instance.phase", InstancePhase.READY.value)
 
     runtime.wait_until_ready = ready
@@ -199,7 +199,7 @@ async def test_repeated_start_does_not_send_second_vast_request(tmp_path):
     entered_wait = asyncio.Event()
     finish_wait = asyncio.Event()
 
-    async def wait_until_ready(instance_id, progress=None):
+    async def wait_until_ready(instance_id, progress=None, *, expected_generation=None):
         entered_wait.set()
         await finish_wait.wait()
 
@@ -258,7 +258,7 @@ async def test_start_waits_for_provider_before_resuming_meter(tmp_path):
     vast = FakeVast()
     runtime = InstanceRuntime(Settings(provision_poll_seconds=0.01), db, vast)
 
-    async def ready(instance_id, progress=None):
+    async def ready(instance_id, progress=None, *, expected_generation=None):
         await db.set("instance.phase", InstancePhase.READY.value)
 
     runtime.wait_until_ready = ready
@@ -305,7 +305,7 @@ async def test_failed_start_leaves_retryable_error_phase(tmp_path):
     vast.running = True
     runtime = InstanceRuntime(Settings(), db, vast)
 
-    async def fail_readiness(instance_id, progress=None):
+    async def fail_readiness(instance_id, progress=None, *, expected_generation=None):
         await db.set("instance.phase", InstancePhase.PROVISIONING.value)
         raise RuntimeErrorState("Fish did not become ready")
 

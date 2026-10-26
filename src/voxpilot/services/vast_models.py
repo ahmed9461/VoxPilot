@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any
 
@@ -17,6 +18,7 @@ def build_offer_query(
     datacenter_only: bool = False,
     min_direct_ports: int = 1,
     min_inet_down_mbps: float = 0,
+    min_inet_up_mbps: float = 0,
 ) -> str:
     terms = [
         "num_gpus=1",
@@ -35,6 +37,8 @@ def build_offer_query(
         terms.append(f"direct_port_count>={int(min_direct_ports)}")
     if min_inet_down_mbps > 0:
         terms.append(f"inet_down>={float(min_inet_down_mbps):.0f}")
+    if min_inet_up_mbps > 0:
+        terms.append(f"inet_up>={float(min_inet_up_mbps):.0f}")
     return " ".join(terms)
 
 
@@ -43,38 +47,55 @@ def _num(raw: dict[str, Any], *names: str, default: float = 0.0) -> float:
         value = raw.get(name)
         if value is not None:
             try:
-                return float(value)
+                number = float(value)
+                if math.isfinite(number):
+                    return number
             except (TypeError, ValueError):
                 pass
     return default
 
 
+def _optional_num(raw: dict[str, Any], *names: str) -> float | None:
+    if all(raw.get(name) is None for name in names):
+        return None
+    # A supplied invalid/zero measurement is not an omitted measurement.
+    return _num(raw, *names, default=0.0)
+
+
 def normalize_offer(raw: dict[str, Any]) -> GpuOffer:
     gpu_ram_mb = _num(raw, "gpu_ram", "gpu_ram_mb")
-    reliability = raw.get("reliability", raw.get("reliability2"))
-    if reliability is not None:
-        reliability = float(reliability)
-        if reliability > 1:
-            reliability /= 100
-    verified_raw = raw.get("verified")
-    verified: bool | None = None
-    if verified_raw is not None:
-        verified = bool(verified_raw)
-    elif raw.get("verification") is not None:
-        verified = str(raw.get("verification")).lower() in {"verified", "true", "1"}
+    reliability = _optional_num(raw, "reliability", "reliability2")
+    if reliability is not None and reliability > 1:
+        reliability /= 100
+    verified_raw = raw.get("verified", raw.get("verification"))
+    verified = None if verified_raw is None else str(verified_raw).lower() in {"verified", "true", "1"}
     return GpuOffer(
-        offer_id=int(raw.get("id") or raw.get("ask_id") or 0),
+        offer_id=int(_num(raw, "id", "ask_id")),
         gpu_name=str(raw.get("gpu_name") or raw.get("gpu_display_name") or "Unknown GPU"),
         gpu_ram_gb=gpu_ram_mb / 1000 if gpu_ram_mb else _num(raw, "gpu_ram_gb"),
-        price_per_hour=_num(raw, "dph_total", "dph_base", "price"),
+        price_per_hour=(_num(raw, "dph_total") if raw.get("dph_total") is not None
+                        else _num(raw, "dph_base", "price")),
         reliability=reliability,
-        dlperf=_num(raw, "dlperf", default=0.0) or None,
+        dlperf=_optional_num(raw, "dlperf"),
         location=raw.get("geolocation") or raw.get("location"),
-        inet_down_mbps=_num(raw, "inet_down", default=0.0) or None,
-        disk_space_gb=_num(raw, "disk_space", default=0.0) or None,
+        inet_down_mbps=_optional_num(raw, "inet_down"),
+        inet_up_mbps=_optional_num(raw, "inet_up"),
+        disk_bw_mbps=_optional_num(raw, "disk_bw"),
+        inet_down_cost_per_gb=_optional_num(raw, "inet_down_cost"),
+        inet_up_cost_per_gb=_optional_num(raw, "inet_up_cost"),
+        disk_space_gb=_optional_num(raw, "disk_space"),
         verified=verified,
         raw=raw,
     )
+
+
+def network_rank(offer: GpuOffer, preferred_mbps: float = 1000.0) -> tuple:
+    """Advertised speed tiers first, then price; never an actual speed test."""
+    down = offer.inet_down_mbps or 0.0
+    target = max(1.0, preferred_mbps)
+    tier = sum(down >= threshold for threshold in (target / 2, target, target * 2, target * 5))
+    return (-tier, offer.price_per_hour, -down, -(offer.inet_up_mbps or 0),
+            -(offer.disk_bw_mbps or 0), -(offer.dlperf or 0), offer.offer_id)
 
 
 def _coerce_mapping(value: Any) -> dict[str, Any]:
