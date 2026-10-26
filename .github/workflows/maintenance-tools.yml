@@ -23,6 +23,7 @@ jobs:
           from pathlib import Path
           p = Path('pyproject.toml')
           s = p.read_text().replace('dev = ["pytest>=8", "pytest-asyncio>=0.24"]', 'dev = ["pytest>=8", "pytest-asyncio>=0.24", "pytest-cov>=6", "ruff>=0.11", "pip-audit>=2.9"]')
+          s = s.replace('"vastai==1.6.0",', '"vastai==1.9.1",\n  "cryptography>=50.0.0",\n  "pillow>=13.0.0",')
           p.write_text(s)
           PY
           mkdir -p /tmp/voxpilot-tools/wheels
